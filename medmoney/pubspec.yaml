@@ -1,0 +1,37 @@
+name: medmoney
+description: Plataforma de Gestão Financeira para Profissionais da Saúde
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  http: ^1.1.2
+  intl: ^0.19.0
+  url_launcher: ^6.2.2
+  flutter_svg: ^2.0.9
+  image_picker: ^1.0.5
+  fl_chart: ^0.66.0
+  supabase_flutter: ^1.10.25
+  webview_flutter: ^4.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/ 
+    - lib/assets/
+    - lib/assets/logo.png
