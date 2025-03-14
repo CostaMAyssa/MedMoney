@@ -2,398 +2,273 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../services/supabase_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AsaasService {
-  // Configurações do Asaas
-  static const String _apiKeySandbox = 'aact_YTU5YTE0M2M2N2I4MTliNzk0YTI5N2U5MzdjNWZmNDQ6OjAwMDAwMDAwMDAwMDAwNDM2MDg6OiRhYWNoXzgwZWVjMGVlLTk2ZjMtNDFmMy1hZjJiLTU5ZWRkYzA3NDRkMw==';
-  static const String _apiKeyProduction = 'SUA_API_KEY_PRODUCAO_ASAAS'; // Será configurada quando for para produção
+  // Singleton pattern
+  static final AsaasService _instance = AsaasService._internal();
+  factory AsaasService() => _instance;
+  AsaasService._internal();
+
+  // URLs da API
+  static const String _sandboxUrl = 'https://sandbox.asaas.com/api/v3';
+  static const String _productionUrl = 'https://www.asaas.com/api/v3';
   
-  // URLs base
-  static const String _baseUrlSandbox = 'https://sandbox.asaas.com/api/v3';
-  static const String _baseUrlProduction = 'https://www.asaas.com/api/v3';
+  // Chaves de API
+  static String get _apiKey => dotenv.env['ASAAS_API_KEY'] ?? 'sua_chave_api_do_asaas';
+  static bool get _isSandbox => dotenv.env['ASAAS_SANDBOX'] == 'true';
   
-  // Determina se está em modo de produção ou sandbox
-  static const bool _isProduction = false; // Altere para true em produção
+  // URL base da API
+  String get _baseUrl => _isSandbox ? _sandboxUrl : _productionUrl;
   
-  // Getters para as configurações atuais
-  static String get _apiKey => _isProduction ? _apiKeyProduction : _apiKeySandbox;
-  static String get _baseUrl => _isProduction ? _baseUrlProduction : _baseUrlSandbox;
-  
-  // Headers padrão para as requisições
-  static Map<String, String> get _headers => {
+  // Headers para as requisições
+  Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'access_token': _apiKey,
   };
   
-  // Criar um cliente (customer) no Asaas
-  static Future<Map<String, dynamic>> createCustomer({
+  // Clientes
+  Future<Map<String, dynamic>> createCustomer({
     required String name,
     required String email,
     required String cpfCnpj,
     String? phone,
+    String? mobilePhone,
+    String? address,
+    String? addressNumber,
+    String? complement,
+    String? province,
+    String? postalCode,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/customers'),
-        headers: _headers,
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'cpfCnpj': cpfCnpj,
-          'phone': phone,
-        }),
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (kDebugMode) {
-          print('Cliente criado com sucesso no Asaas: ${data['id']}');
-        }
-        return data;
-      } else {
-        throw Exception('Erro ao criar cliente no Asaas: ${data['errors'][0]['description']}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao criar cliente no Asaas: $e');
-      }
-      rethrow;
+    final url = Uri.parse('$_baseUrl/customers');
+    
+    final body = jsonEncode({
+      'name': name,
+      'email': email,
+      'cpfCnpj': cpfCnpj,
+      if (phone != null) 'phone': phone,
+      if (mobilePhone != null) 'mobilePhone': mobilePhone,
+      if (address != null) 'address': address,
+      if (addressNumber != null) 'addressNumber': addressNumber,
+      if (complement != null) 'complement': complement,
+      if (province != null) 'province': province,
+      if (postalCode != null) 'postalCode': postalCode,
+    });
+    
+    final response = await http.post(url, headers: _headers, body: body);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao criar cliente: ${response.body}');
     }
   }
   
-  // Criar uma cobrança (payment) no Asaas
-  static Future<Map<String, dynamic>> createPayment({
+  Future<Map<String, dynamic>> getCustomer(String customerId) async {
+    final url = Uri.parse('$_baseUrl/customers/$customerId');
+    
+    final response = await http.get(url, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao obter cliente: ${response.body}');
+    }
+  }
+  
+  Future<Map<String, dynamic>> updateCustomer({
+    required String customerId,
+    String? name,
+    String? email,
+    String? cpfCnpj,
+    String? phone,
+    String? mobilePhone,
+    String? address,
+    String? addressNumber,
+    String? complement,
+    String? province,
+    String? postalCode,
+  }) async {
+    final url = Uri.parse('$_baseUrl/customers/$customerId');
+    
+    final Map<String, dynamic> data = {};
+    
+    if (name != null) data['name'] = name;
+    if (email != null) data['email'] = email;
+    if (cpfCnpj != null) data['cpfCnpj'] = cpfCnpj;
+    if (phone != null) data['phone'] = phone;
+    if (mobilePhone != null) data['mobilePhone'] = mobilePhone;
+    if (address != null) data['address'] = address;
+    if (addressNumber != null) data['addressNumber'] = addressNumber;
+    if (complement != null) data['complement'] = complement;
+    if (province != null) data['province'] = province;
+    if (postalCode != null) data['postalCode'] = postalCode;
+    
+    final body = jsonEncode(data);
+    
+    final response = await http.post(url, headers: _headers, body: body);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao atualizar cliente: ${response.body}');
+    }
+  }
+  
+  // Assinaturas
+  Future<Map<String, dynamic>> createSubscription({
+    required String customerId,
+    required double value,
+    required String billingType,
+    required String cycle,
+    required String description,
+    String? nextDueDate,
+    int? dueDayMonth,
+    int? discountValue,
+    String? creditCardHolderName,
+    String? creditCardNumber,
+    String? creditCardExpiryMonth,
+    String? creditCardExpiryYear,
+    String? creditCardCcv,
+  }) async {
+    final url = Uri.parse('$_baseUrl/subscriptions');
+    
+    final Map<String, dynamic> data = {
+      'customer': customerId,
+      'value': value,
+      'billingType': billingType,
+      'cycle': cycle,
+      'description': description,
+    };
+    
+    if (nextDueDate != null) data['nextDueDate'] = nextDueDate;
+    if (dueDayMonth != null) data['dueDayMonth'] = dueDayMonth;
+    if (discountValue != null) data['discountValue'] = discountValue;
+    
+    // Dados do cartão de crédito (se aplicável)
+    if (billingType == 'CREDIT_CARD') {
+      if (creditCardHolderName == null || 
+          creditCardNumber == null || 
+          creditCardExpiryMonth == null || 
+          creditCardExpiryYear == null || 
+          creditCardCcv == null) {
+        throw Exception('Dados do cartão de crédito incompletos');
+      }
+      
+      data['creditCard'] = {
+        'holderName': creditCardHolderName,
+        'number': creditCardNumber,
+        'expiryMonth': creditCardExpiryMonth,
+        'expiryYear': creditCardExpiryYear,
+        'ccv': creditCardCcv,
+      };
+      
+      data['creditCardHolderInfo'] = {
+        'name': creditCardHolderName,
+        'email': 'email@cliente.com',
+        'cpfCnpj': '00000000000',
+        'postalCode': '00000000',
+        'addressNumber': '000',
+        'addressComplement': null,
+        'phone': '0000000000',
+        'mobilePhone': '0000000000',
+      };
+    }
+    
+    final body = jsonEncode(data);
+    
+    final response = await http.post(url, headers: _headers, body: body);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao criar assinatura: ${response.body}');
+    }
+  }
+  
+  Future<Map<String, dynamic>> getSubscription(String subscriptionId) async {
+    final url = Uri.parse('$_baseUrl/subscriptions/$subscriptionId');
+    
+    final response = await http.get(url, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao obter assinatura: ${response.body}');
+    }
+  }
+  
+  Future<Map<String, dynamic>> cancelSubscription(String subscriptionId) async {
+    final url = Uri.parse('$_baseUrl/subscriptions/$subscriptionId/cancel');
+    
+    final response = await http.post(url, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao cancelar assinatura: ${response.body}');
+    }
+  }
+  
+  // Pagamentos
+  Future<Map<String, dynamic>> createPayment({
     required String customerId,
     required double value,
     required String description,
     required String dueDate,
     String? externalReference,
-    bool? installment = false,
-    int? installmentCount,
-    String billingType = 'CREDIT_CARD', // BOLETO, CREDIT_CARD, PIX
+    String? billingType,
   }) async {
-    try {
-      final Map<String, dynamic> paymentData = {
-        'customer': customerId,
-        'billingType': billingType,
-        'value': value,
-        'description': description,
-        'dueDate': dueDate,
-      };
-      
-      if (externalReference != null) {
-        paymentData['externalReference'] = externalReference;
-      }
-      
-      if (installment == true && installmentCount != null) {
-        paymentData['installmentCount'] = installmentCount;
-        paymentData['installmentValue'] = value / installmentCount;
-      }
-      
-      final response = await http.post(
-        Uri.parse('$_baseUrl/payments'),
-        headers: _headers,
-        body: jsonEncode(paymentData),
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (kDebugMode) {
-          print('Cobrança criada com sucesso no Asaas: ${data['id']}');
-        }
-        
-        // Salvar a cobrança no Supabase
-        await _savePaymentToSupabase(data);
-        
-        return data;
-      } else {
-        throw Exception('Erro ao criar cobrança no Asaas: ${data['errors'][0]['description']}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao criar cobrança no Asaas: $e');
-      }
-      rethrow;
+    final url = Uri.parse('$_baseUrl/payments');
+    
+    final body = jsonEncode({
+      'customer': customerId,
+      'value': value,
+      'description': description,
+      'dueDate': dueDate,
+      if (externalReference != null) 'externalReference': externalReference,
+      'billingType': billingType ?? 'BOLETO',
+    });
+    
+    final response = await http.post(url, headers: _headers, body: body);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao criar pagamento: ${response.body}');
     }
   }
   
-  // Processar pagamento com cartão de crédito
-  static Future<Map<String, dynamic>> processCreditCardPayment({
-    required String paymentId,
-    required String holderName,
-    required String number,
-    required String expiryMonth,
-    required String expiryYear,
-    required String cvv,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/payments/$paymentId/payWithCreditCard'),
-        headers: _headers,
-        body: jsonEncode({
-          'creditCard': {
-            'holderName': holderName,
-            'number': number,
-            'expiryMonth': expiryMonth,
-            'expiryYear': expiryYear,
-            'cvv': cvv,
-          },
-          'creditCardHolderInfo': {
-            'name': holderName,
-            'email': await _getCurrentUserEmail(),
-            'cpfCnpj': '00000000000', // Deve ser substituído pelo CPF real
-            'postalCode': '00000000', // Deve ser substituído pelo CEP real
-            'addressNumber': '0', // Deve ser substituído pelo número real
-            'phone': '00000000000', // Deve ser substituído pelo telefone real
-          },
-        }),
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (kDebugMode) {
-          print('Pagamento com cartão processado com sucesso: ${data['id']}');
-        }
-        
-        // Atualizar o status do pagamento no Supabase
-        await _updatePaymentStatusInSupabase(paymentId, data['status']);
-        
-        return data;
-      } else {
-        throw Exception('Erro ao processar pagamento com cartão: ${data['errors'][0]['description']}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao processar pagamento com cartão: $e');
-      }
-      rethrow;
+  Future<Map<String, dynamic>> getPayment(String paymentId) async {
+    final url = Uri.parse('$_baseUrl/payments/$paymentId');
+    
+    final response = await http.get(url, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao obter pagamento: ${response.body}');
     }
   }
   
-  // Gerar QR Code PIX
-  static Future<Map<String, dynamic>> generatePixQrCode(String paymentId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/payments/$paymentId/pixQrCode'),
-        headers: _headers,
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (kDebugMode) {
-          print('QR Code PIX gerado com sucesso');
-        }
-        return data;
-      } else {
-        throw Exception('Erro ao gerar QR Code PIX: ${data['errors'][0]['description']}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao gerar QR Code PIX: $e');
-      }
-      rethrow;
+  Future<Map<String, dynamic>> cancelPayment(String paymentId) async {
+    final url = Uri.parse('$_baseUrl/payments/$paymentId');
+    
+    final response = await http.delete(url, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao cancelar pagamento: ${response.body}');
     }
   }
   
-  // Consultar status de um pagamento
-  static Future<Map<String, dynamic>> getPaymentStatus(String paymentId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/payments/$paymentId'),
-        headers: _headers,
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (kDebugMode) {
-          print('Status do pagamento consultado com sucesso: ${data['status']}');
-        }
-        return data;
-      } else {
-        throw Exception('Erro ao consultar status do pagamento: ${data['errors'][0]['description']}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao consultar status do pagamento: $e');
-      }
-      rethrow;
-    }
+  // Métodos auxiliares
+  String getPaymentUrl(String paymentId) {
+    return '$_baseUrl/payments/$paymentId/identificationField';
   }
   
-  // Salvar pagamento no Supabase
-  static Future<void> _savePaymentToSupabase(Map<String, dynamic> paymentData) async {
-    try {
-      final user = SupabaseService.getCurrentUser();
-      if (user == null) throw Exception('Usuário não autenticado');
-      
-      await SupabaseService.client.from('payments').insert({
-        'user_id': user.id,
-        'payment_method': paymentData['billingType'],
-        'amount': paymentData['value'],
-        'description': paymentData['description'],
-        'status': paymentData['status'],
-        'asaas_id': paymentData['id'],
-      });
-      
-      if (kDebugMode) {
-        print('Pagamento salvo no Supabase com sucesso');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao salvar pagamento no Supabase: $e');
-      }
-      rethrow;
-    }
-  }
-  
-  // Atualizar status do pagamento no Supabase
-  static Future<void> _updatePaymentStatusInSupabase(String asaasId, String status) async {
-    try {
-      final user = SupabaseService.getCurrentUser();
-      if (user == null) throw Exception('Usuário não autenticado');
-      
-      await SupabaseService.client
-          .from('payments')
-          .update({'status': status})
-          .eq('asaas_id', asaasId)
-          .eq('user_id', user.id);
-      
-      if (kDebugMode) {
-        print('Status do pagamento atualizado no Supabase com sucesso');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao atualizar status do pagamento no Supabase: $e');
-      }
-      rethrow;
-    }
-  }
-  
-  // Obter email do usuário atual
-  static Future<String> _getCurrentUserEmail() async {
-    final user = SupabaseService.getCurrentUser();
-    if (user == null) throw Exception('Usuário não autenticado');
-    return user.email ?? '';
-  }
-  
-  // Processar pagamento (método principal a ser chamado pela aplicação)
-  static Future<Map<String, dynamic>> processPayment({
-    required String paymentMethod,
-    required double amount,
-    required String description,
-    String? cardNumber,
-    String? cardHolder,
-    String? expiryDate,
-    String? cvv,
-  }) async {
-    try {
-      // Obter o usuário atual
-      final user = SupabaseService.getCurrentUser();
-      if (user == null) throw Exception('Usuário não autenticado');
-      
-      // Obter ou criar o cliente no Asaas
-      final customerData = await _getOrCreateCustomer(user.email ?? '');
-      
-      // Criar a cobrança
-      final dueDate = DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T')[0];
-      final billingType = _getBillingTypeFromPaymentMethod(paymentMethod);
-      
-      final paymentData = await createPayment(
-        customerId: customerData['id'],
-        value: amount,
-        description: description,
-        dueDate: dueDate,
-        externalReference: user.id,
-        billingType: billingType,
-      );
-      
-      // Processar o pagamento de acordo com o método
-      if (paymentMethod == 'credit_card' && 
-          cardNumber != null && 
-          cardHolder != null && 
-          expiryDate != null && 
-          cvv != null) {
-        
-        final expiryParts = expiryDate.split('/');
-        if (expiryParts.length != 2) throw Exception('Data de validade inválida');
-        
-        return await processCreditCardPayment(
-          paymentId: paymentData['id'],
-          holderName: cardHolder,
-          number: cardNumber.replaceAll(' ', ''),
-          expiryMonth: expiryParts[0],
-          expiryYear: expiryParts[1],
-          cvv: cvv,
-        );
-      } else if (paymentMethod == 'pix') {
-        return await generatePixQrCode(paymentData['id']);
-      } else {
-        return paymentData;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao processar pagamento: $e');
-      }
-      rethrow;
-    }
-  }
-  
-  // Obter ou criar cliente no Asaas
-  static Future<Map<String, dynamic>> _getOrCreateCustomer(String email) async {
-    try {
-      // Tentar encontrar o cliente pelo email
-      final response = await http.get(
-        Uri.parse('$_baseUrl/customers?email=$email'),
-        headers: _headers,
-      );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300 && data['data'].isNotEmpty) {
-        return data['data'][0];
-      } else {
-        // Cliente não encontrado, criar um novo
-        final user = SupabaseService.getCurrentUser();
-        if (user == null) throw Exception('Usuário não autenticado');
-        
-        // Obter dados do perfil do usuário
-        final profileData = await SupabaseService.client
-            .from('profiles')
-            .select()
-            .eq('id', user.id)
-            .single();
-        
-        return await createCustomer(
-          name: profileData['name'] ?? 'Cliente',
-          email: email,
-          cpfCnpj: '00000000000', // Deve ser substituído pelo CPF real
-          phone: profileData['phone'],
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao obter ou criar cliente no Asaas: $e');
-      }
-      rethrow;
-    }
-  }
-  
-  // Converter método de pagamento para o formato do Asaas
-  static String _getBillingTypeFromPaymentMethod(String paymentMethod) {
-    switch (paymentMethod) {
-      case 'credit_card':
-        return 'CREDIT_CARD';
-      case 'pix':
-        return 'PIX';
-      case 'boleto':
-        return 'BOLETO';
-      default:
-        return 'UNDEFINED';
-    }
+  String getSubscriptionUrl(String subscriptionId) {
+    return '$_baseUrl/subscriptions/$subscriptionId';
   }
 } 
