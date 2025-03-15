@@ -199,6 +199,28 @@ class SupabaseService {
     }
   }
   
+  // Buscar assinatura pelo ID externo (ID do pagamento ou assinatura no Asaas)
+  Future<Map<String, dynamic>?> getSubscriptionByExternalId(String externalId) async {
+    try {
+      final response = await client
+          .from('subscriptions')
+          .select()
+          .eq('external_id', externalId)
+          .limit(1);
+      
+      final data = response as List;
+      
+      if (data.isEmpty) {
+        return null;
+      }
+      
+      return data.first as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Erro ao buscar assinatura pelo ID externo: $e');
+      return null;
+    }
+  }
+  
   Future<void> createSubscription(Map<String, dynamic> data) async {
     try {
       final userId = client.auth.currentUser?.id;

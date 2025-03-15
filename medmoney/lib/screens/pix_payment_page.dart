@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math' show min;
+import 'package:provider/provider.dart';
 import '../utils/theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/responsive_container.dart';
 import '../utils/routes.dart';
+import '../providers/payment_provider.dart';
 
-class PixPaymentPage extends StatelessWidget {
+class PixPaymentPage extends StatefulWidget {
   final Map<String, dynamic> pixInfo;
   final String planName;
   final String planType;
@@ -20,6 +22,14 @@ class PixPaymentPage extends StatelessWidget {
     required this.planName,
     required this.planType,
   }) : super(key: key);
+
+  @override
+  State<PixPaymentPage> createState() => _PixPaymentPageState();
+}
+
+class _PixPaymentPageState extends State<PixPaymentPage> {
+  bool _isCheckingPayment = false;
+  String? _paymentStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +82,7 @@ class PixPaymentPage extends StatelessWidget {
                         children: [
                           // Resumo da compra
                           Text(
-                            'Plano ${planName} (${planType == 'annual' ? 'Anual' : 'Mensal'})',
+                            'Plano ${widget.planName} (${widget.planType == 'annual' ? 'Anual' : 'Mensal'})',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -105,7 +115,7 @@ class PixPaymentPage extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    pixInfo['copyPaste'] ?? 'Código não disponível',
+                                    widget.pixInfo['copyPaste'] ?? 'Código não disponível',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: AppTheme.textPrimaryColor,
@@ -127,6 +137,85 @@ class PixPaymentPage extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 32),
+                          
+                          // Status do pagamento
+                          if (_paymentStatus != null)
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _paymentStatus == 'CONFIRMED' || 
+                                      _paymentStatus == 'RECEIVED' || 
+                                      _paymentStatus == 'RECEIVED_IN_CASH'
+                                    ? AppTheme.successColor.withOpacity(0.2)
+                                    : AppTheme.warningColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _paymentStatus == 'CONFIRMED' || 
+                                    _paymentStatus == 'RECEIVED' || 
+                                    _paymentStatus == 'RECEIVED_IN_CASH'
+                                      ? Icons.check_circle
+                                      : Icons.pending,
+                                    color: _paymentStatus == 'CONFIRMED' || 
+                                          _paymentStatus == 'RECEIVED' || 
+                                          _paymentStatus == 'RECEIVED_IN_CASH'
+                                        ? AppTheme.successColor
+                                        : AppTheme.warningColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _paymentStatus == 'CONFIRMED' || 
+                                      _paymentStatus == 'RECEIVED' || 
+                                      _paymentStatus == 'RECEIVED_IN_CASH'
+                                        ? 'Pagamento confirmado! Redirecionando...'
+                                        : 'Pagamento pendente. Aguardando confirmação...',
+                                      style: TextStyle(
+                                        color: _paymentStatus == 'CONFIRMED' || 
+                                              _paymentStatus == 'RECEIVED' || 
+                                              _paymentStatus == 'RECEIVED_IN_CASH'
+                                            ? AppTheme.successColor
+                                            : AppTheme.warningColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          
+                          // Botão para verificar pagamento
+                          if (Provider.of<PaymentProvider>(context).paymentData != null &&
+                              Provider.of<PaymentProvider>(context).paymentData!['id'] != null)
+                            ElevatedButton.icon(
+                              onPressed: _isCheckingPayment
+                                  ? null
+                                  : () => _checkPaymentStatus(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                              icon: _isCheckingPayment
+                                  ? Container(
+                                      width: 24,
+                                      height: 24,
+                                      padding: const EdgeInsets.all(2.0),
+                                      child: const CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 3,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh),
+                              label: Text(
+                                _isCheckingPayment
+                                    ? 'Verificando...'
+                                    : 'Verificar Status do Pagamento',
+                              ),
+                            ),
                           const SizedBox(height: 32),
                           
                           // Instruções
@@ -161,9 +250,9 @@ class PixPaymentPage extends StatelessWidget {
                           const SizedBox(height: 32),
                           
                           // Data de expiração
-                          if (pixInfo['expirationDate'] != null)
+                          if (widget.pixInfo['expirationDate'] != null)
                             Text(
-                              'Este PIX expira em: ${pixInfo['expirationDate']}',
+                              'Este PIX expira em: ${widget.pixInfo['expirationDate']}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.warningColor,
@@ -194,11 +283,64 @@ class PixPaymentPage extends StatelessWidget {
     );
   }
   
+  // Verificar o status do pagamento
+  Future<void> _checkPaymentStatus(BuildContext context) async {
+    final paymentProvider = Provider.of<PaymentProvider>(context, listen: false);
+    final paymentId = paymentProvider.paymentData?['id'];
+    
+    if (paymentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ID do pagamento não disponível'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      _isCheckingPayment = true;
+    });
+    
+    try {
+      final paymentStatus = await paymentProvider.checkPaymentStatus(paymentId);
+      
+      setState(() {
+        _isCheckingPayment = false;
+        _paymentStatus = paymentStatus?['status'];
+      });
+      
+      // Se o pagamento foi confirmado, redirecionar para o dashboard após 3 segundos
+      if (paymentStatus != null && 
+          (paymentStatus['status'] == 'CONFIRMED' || 
+           paymentStatus['status'] == 'RECEIVED' || 
+           paymentStatus['status'] == 'RECEIVED_IN_CASH')) {
+        
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+          }
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isCheckingPayment = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao verificar status do pagamento: ${e.toString()}'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+  
   Widget _buildQrCode(BuildContext context) {
     try {
-      if (pixInfo['qrCode'] != null || pixInfo['encodedImage'] != null) {
+      if (widget.pixInfo['qrCode'] != null || widget.pixInfo['encodedImage'] != null) {
         // Usar a chave correta para o QR code
-        final qrCodeBase64 = pixInfo['encodedImage'] ?? pixInfo['qrCode'];
+        final qrCodeBase64 = widget.pixInfo['encodedImage'] ?? widget.pixInfo['qrCode'];
         
         if (qrCodeBase64 == null || qrCodeBase64.isEmpty) {
           return _buildQrCodePlaceholder('QR Code temporariamente indisponível');
@@ -278,8 +420,8 @@ class PixPaymentPage extends StatelessWidget {
   
   void _copyPixCode(BuildContext context) {
     try {
-      if (pixInfo['copyPaste'] != null) {
-        Clipboard.setData(ClipboardData(text: pixInfo['copyPaste']));
+      if (widget.pixInfo['copyPaste'] != null) {
+        Clipboard.setData(ClipboardData(text: widget.pixInfo['copyPaste']));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Código PIX copiado para a área de transferência'),

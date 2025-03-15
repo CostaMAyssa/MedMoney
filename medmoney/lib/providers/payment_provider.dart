@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/asaas_service.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 
 enum PaymentStatus {
   initial,
@@ -382,5 +383,91 @@ class PaymentProvider with ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+  
+  // Método para verificar o status do pagamento
+  Future<Map<String, dynamic>?> checkPaymentStatus(String paymentId) async {
+    try {
+      debugPrint('Verificando status do pagamento: $paymentId');
+      
+      // Verificar o status do pagamento no Asaas
+      final paymentStatus = await _asaasService.getPayment(paymentId);
+      
+      if (paymentStatus != null) {
+        debugPrint('Status do pagamento: ${paymentStatus['status']}');
+        
+        // Se o pagamento foi confirmado, atualizar a assinatura no Supabase
+        if (paymentStatus['status'] == 'CONFIRMED' || 
+            paymentStatus['status'] == 'RECEIVED' ||
+            paymentStatus['status'] == 'RECEIVED_IN_CASH') {
+          
+          try {
+            // Buscar a assinatura pelo ID externo
+            final subscription = await _supabaseService.getSubscriptionByExternalId(paymentId);
+            
+            if (subscription != null) {
+              // Atualizar o status da assinatura para ativo
+              await _supabaseService.updateSubscription(
+                subscription['id'],
+                {
+                  'status': 'active',
+                  'payment_status': 'confirmed',
+                  'updated_at': DateTime.now().toIso8601String(),
+                },
+              );
+              
+              debugPrint('Assinatura atualizada para ativa');
+            }
+          } catch (e) {
+            debugPrint('Erro ao atualizar assinatura: $e');
+          }
+        }
+        
+        return paymentStatus;
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Erro ao verificar status do pagamento: $e');
+      return null;
+    }
+  }
+  
+  // Método para verificar periodicamente o status do pagamento PIX
+  Future<bool> startPaymentStatusCheck(String paymentId, {int maxAttempts = 10}) async {
+    int attempts = 0;
+    bool isConfirmed = false;
+    
+    debugPrint('Iniciando verificação periódica do pagamento: $paymentId');
+    
+    // Verificar o status a cada 30 segundos
+    Timer.periodic(const Duration(seconds: 30), (timer) async {
+      attempts++;
+      debugPrint('Verificação $attempts de $maxAttempts');
+      
+      // Verificar o status do pagamento
+      final status = await checkPaymentStatus(paymentId);
+      
+      // Se o pagamento foi confirmado ou o número máximo de tentativas foi atingido
+      if (status != null && 
+          (status['status'] == 'CONFIRMED' || 
+           status['status'] == 'RECEIVED' || 
+           status['status'] == 'RECEIVED_IN_CASH')) {
+        
+        isConfirmed = true;
+        timer.cancel();
+        
+        // Notificar os ouvintes
+        _status = PaymentStatus.success;
+        notifyListeners();
+        
+        debugPrint('Pagamento confirmado!');
+      } else if (attempts >= maxAttempts) {
+        timer.cancel();
+        debugPrint('Número máximo de tentativas atingido');
+      }
+    });
+    
+    return isConfirmed;
   }
 } 

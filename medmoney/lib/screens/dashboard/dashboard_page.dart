@@ -84,12 +84,35 @@ class _DashboardPageState extends State<DashboardPage> {
         _isCheckingSubscription = false;
       });
       
-      // Se não tiver assinatura ativa, redirecionar para a página de planos
-      if (subscription == null || subscription['status'] != 'active') {
+      // Verificar se o usuário tem uma assinatura ativa e paga
+      bool hasValidSubscription = false;
+      
+      if (subscription != null) {
+        // Verificar se a assinatura está ativa
+        bool isActive = subscription['status'] == 'active';
+        
+        // Verificar se o pagamento foi confirmado
+        bool isPaid = subscription['payment_status'] == 'confirmed' || 
+                      subscription['payment_status'] == 'paid';
+        
+        // Verificar se é um plano premium (que dá acesso ao dashboard)
+        bool isPremium = subscription['plan_name']?.toLowerCase() == 'premium';
+        
+        // Acesso permitido apenas se todas as condições forem atendidas
+        hasValidSubscription = isActive && isPaid && isPremium;
+        
+        debugPrint('Status da assinatura: ${subscription['status']}');
+        debugPrint('Status do pagamento: ${subscription['payment_status']}');
+        debugPrint('Plano: ${subscription['plan_name']}');
+        debugPrint('Acesso ao dashboard: ${hasValidSubscription ? 'Permitido' : 'Negado'}');
+      }
+      
+      // Se não tiver assinatura válida, redirecionar para a página de planos
+      if (!hasValidSubscription) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Você não possui uma assinatura ativa. Por favor, escolha um plano.'),
+              content: Text('Você precisa de uma assinatura Premium ativa para acessar o dashboard.'),
               backgroundColor: AppTheme.warningColor,
               duration: Duration(seconds: 5),
             ),
@@ -113,6 +136,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Verificar se o usuário tem uma assinatura premium ativa
+    bool hasValidSubscription = false;
+    
+    if (_subscription != null) {
+      bool isActive = _subscription!['status'] == 'active';
+      bool isPaid = _subscription!['payment_status'] == 'confirmed' || 
+                    _subscription!['payment_status'] == 'paid';
+      bool isPremium = _subscription!['plan_name']?.toLowerCase() == 'premium';
+      
+      hasValidSubscription = isActive && isPaid && isPremium;
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -132,25 +167,27 @@ class _DashboardPageState extends State<DashboardPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Chip(
-                backgroundColor: _subscription!['status'] == 'active' 
+                backgroundColor: hasValidSubscription
                     ? AppTheme.successColor.withOpacity(0.2) 
                     : AppTheme.warningColor.withOpacity(0.2),
                 label: Text(
-                  _subscription!['status'] == 'active' 
-                      ? 'Assinatura Ativa' 
-                      : 'Assinatura ${_subscription!['status']}',
+                  hasValidSubscription
+                      ? 'Premium Ativo' 
+                      : _subscription!['plan_name'] == 'Premium' 
+                          ? 'Premium Pendente'
+                          : 'Básico',
                   style: TextStyle(
-                    color: _subscription!['status'] == 'active' 
+                    color: hasValidSubscription
                         ? AppTheme.successColor 
                         : AppTheme.warningColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 avatar: Icon(
-                  _subscription!['status'] == 'active' 
+                  hasValidSubscription
                       ? Icons.check_circle 
                       : Icons.warning,
-                  color: _subscription!['status'] == 'active' 
+                  color: hasValidSubscription
                       ? AppTheme.successColor 
                       : AppTheme.warningColor,
                   size: 16,
@@ -181,7 +218,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             )
-          : _subscription == null || _subscription!['status'] != 'active'
+          : !hasValidSubscription
               ? _buildNoSubscriptionView()
               : kIsWeb
                   ? _buildWebDashboard()
@@ -238,6 +275,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildNoSubscriptionView() {
+    // Verificar se o usuário tem alguma assinatura
+    bool hasPendingPremium = _subscription != null && 
+                            _subscription!['plan_name']?.toLowerCase() == 'premium' &&
+                            _subscription!['status'] != 'cancelled';
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -245,13 +287,13 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.subscriptions_outlined,
+              hasPendingPremium ? Icons.pending_actions : Icons.subscriptions_outlined,
               color: AppTheme.warningColor,
               size: 80,
             ),
             const SizedBox(height: 24),
             Text(
-              'Assinatura Necessária',
+              hasPendingPremium ? 'Pagamento Pendente' : 'Assinatura Premium Necessária',
               style: TextStyle(
                 color: AppTheme.textPrimaryColor,
                 fontSize: 24,
@@ -261,7 +303,9 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Para acessar o dashboard completo, você precisa ter uma assinatura ativa.',
+              hasPendingPremium 
+                ? 'Seu pagamento do plano Premium está pendente. Após a confirmação, você terá acesso ao dashboard completo.'
+                : 'Para acessar o dashboard completo, você precisa ter uma assinatura Premium ativa.',
               style: TextStyle(
                 color: AppTheme.textSecondaryColor,
                 fontSize: 16,
@@ -277,9 +321,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 backgroundColor: AppTheme.primaryColor,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
-              child: const Text(
-                'Ver Planos Disponíveis',
-                style: TextStyle(fontSize: 16),
+              child: Text(
+                hasPendingPremium ? 'Verificar Status do Pagamento' : 'Ver Planos Disponíveis',
+                style: const TextStyle(fontSize: 16),
               ),
             ),
           ],
