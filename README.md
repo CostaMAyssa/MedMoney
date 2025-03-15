@@ -37,7 +37,7 @@ MedMoney é uma aplicação Flutter desenvolvida para auxiliar profissionais de 
 
 1. Clone o repositório
 ```bash
-git clone https://github.com/SEU_USUARIO/MedMoney.git
+git clone https://github.com/CostaMAyssa/MedMoney.git
 cd MedMoney/medmoney
 ```
 
@@ -91,4 +91,4 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para d
 
 Mayssa Ferreira - mayssaprog16@outlook.com
 
-Link do projeto: [https://github.com/SEU_USUARIO/MedMoney](https://github.com/SEU_USUARIO/MedMoney) 
+Link do projeto: [https://github.com/CostaMAyssa/MedMoney](https://github.com/CostaMAyssa/MedMoney)

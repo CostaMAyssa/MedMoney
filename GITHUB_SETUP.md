@@ -3,8 +3,8 @@
 Após criar o repositório no GitHub, execute os seguintes comandos no terminal:
 
 ```bash
-# Substitua SEU_USUARIO pelo seu nome de usuário do GitHub
-git remote add origin https://github.com/SEU_USUARIO/MedMoney.git
+# Repositório já configurado
+git remote add origin https://github.com/CostaMAyssa/MedMoney.git
 git branch -M main
 git push -u origin main
 ```
