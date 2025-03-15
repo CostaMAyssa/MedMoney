@@ -343,8 +343,26 @@ class PixPaymentPage extends StatelessWidget {
 // Função para decodificar base64
 Uint8List base64Decode(String source) {
   try {
+    // Remover prefixos comuns de base64 de imagens
+    String cleanSource = source;
+    if (cleanSource.startsWith('data:image/png;base64,')) {
+      cleanSource = cleanSource.substring('data:image/png;base64,'.length);
+    } else if (cleanSource.startsWith('data:image/jpeg;base64,')) {
+      cleanSource = cleanSource.substring('data:image/jpeg;base64,'.length);
+    }
+    
+    // Remover quebras de linha e espaços
+    cleanSource = cleanSource.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '');
+    
+    // Normalizar a string base64 se necessário
+    if (cleanSource.length % 4 != 0) {
+      debugPrint('Normalizando string base64 (comprimento original: ${cleanSource.length})');
+      cleanSource = base64.normalize(cleanSource);
+    }
+    
+    debugPrint('Decodificando base64 (comprimento: ${cleanSource.length})');
     return Uint8List.fromList(
-      const Base64Decoder().convert(source.replaceAll('\n', '')),
+      const Base64Decoder().convert(cleanSource),
     );
   } catch (e) {
     debugPrint('Erro ao decodificar base64: $e');

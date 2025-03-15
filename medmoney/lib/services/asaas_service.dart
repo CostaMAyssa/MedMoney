@@ -489,11 +489,37 @@ class AsaasService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         debugPrint('QR Code PIX obtido com sucesso');
-        return {
-          'encodedImage': data['encodedImage'],
-          'payload': data['payload'],
-          'expirationDate': data['expirationDate'],
-        };
+        
+        // Verificar se a imagem está codificada corretamente
+        if (data['encodedImage'] != null) {
+          // Verificar se a string base64 começa com prefixos comuns que precisam ser removidos
+          String encodedImage = data['encodedImage'];
+          if (encodedImage.startsWith('data:image/png;base64,')) {
+            encodedImage = encodedImage.substring('data:image/png;base64,'.length);
+          }
+          
+          // Garantir que a string base64 não tenha quebras de linha
+          encodedImage = encodedImage.replaceAll('\n', '').replaceAll('\r', '');
+          
+          // Verificar se a string base64 é válida
+          try {
+            base64Decode(encodedImage);
+            debugPrint('QR Code base64 validado com sucesso');
+          } catch (e) {
+            debugPrint('QR Code base64 inválido: $e');
+            // Tentar corrigir a string base64
+            encodedImage = base64.normalize(encodedImage);
+          }
+          
+          return {
+            'encodedImage': encodedImage,
+            'payload': data['payload'],
+            'expirationDate': data['expirationDate'],
+          };
+        } else {
+          debugPrint('QR Code não contém imagem codificada');
+          throw Exception('QR Code não contém imagem codificada');
+        }
       } else {
         throw Exception('Falha ao obter QR Code PIX: ${response.body}');
       }
