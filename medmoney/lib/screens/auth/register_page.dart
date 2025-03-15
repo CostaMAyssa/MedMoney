@@ -81,42 +81,42 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       try {
-        // Preparar dados do usuário para o Supabase
-        final userData = {
-          'name': _nameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'city': _cityController.text.trim(),
-          'state': _stateController.text.trim(),
-          'plan': _selectedPlan,
-          'plan_type': _isAnnualPlan ? 'annual' : 'monthly',
-          'plan_price': _isAnnualPlan 
-              ? (_selectedPlan == 'Básico' ? 142.00 : 228.00) 
-              : (_selectedPlan == 'Básico' ? 13.90 : 22.90),
-          'setup_fee': 49.90, // Taxa de setup inicial
-        };
-
         // Registrar usuário no Supabase
-        final response = await SupabaseService.signUp(
+        final supabaseService = SupabaseService();
+        
+        debugPrint('Iniciando registro com email: ${_emailController.text.trim()}');
+        
+        final response = await supabaseService.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text,
-          userData: userData,
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
         );
+
+        debugPrint('Resposta do registro: ${response.user != null ? 'Sucesso' : 'Falha'}');
 
         if (response.user != null) {
           // Registro bem-sucedido
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Conta criada com sucesso! Prossiga para o pagamento.'),
+                content: Text('Conta criada com sucesso! Agora complete seu pagamento.'),
                 backgroundColor: AppTheme.successColor,
               ),
             );
             
-            // Navegar para a página de pagamento
-            final planPrice = _isAnnualPlan 
-                ? (_selectedPlan == 'Básico' ? 142.00 : 228.00) 
-                : (_selectedPlan == 'Básico' ? 13.90 : 22.90);
-                
+            // Calcular preço com base no plano selecionado
+            final double planPrice = _selectedPlan == 'Básico' 
+                ? (_isAnnualPlan ? 199.00 : 19.90)
+                : (_isAnnualPlan ? 299.00 : 29.90);
+            
+            // Taxa de setup fixa
+            const double setupFee = 49.90;
+            
+            // Calcular preço total
+            final double totalPrice = planPrice + setupFee;
+            
+            // Navegar para a tela de pagamento após o registro
             Navigator.pushReplacementNamed(
               context, 
               '/payment',
@@ -124,22 +124,37 @@ class _RegisterPageState extends State<RegisterPage> {
                 'planName': _selectedPlan,
                 'planType': _isAnnualPlan ? 'annual' : 'monthly',
                 'planPrice': planPrice,
-                'setupFee': 49.90, // Taxa de setup inicial
-                'totalPrice': planPrice + 49.90, // Preço total incluindo setup
+                'setupFee': setupFee,
+                'totalPrice': totalPrice,
               },
             );
           }
         } else {
           // Erro no registro
           setState(() {
-            _errorMessage = 'Falha ao criar conta. Tente novamente.';
+            _errorMessage = 'Falha ao criar conta. Verifique se o email já está em uso.';
             _isLoading = false;
           });
         }
       } catch (e) {
         // Erro durante o registro
+        debugPrint('Erro detalhado no registro: $e');
+        
+        String errorMsg = 'Erro ao criar conta';
+        
+        // Verificar tipos específicos de erro
+        if (e.toString().contains('email')) {
+          errorMsg = 'Email inválido ou já está em uso';
+        } else if (e.toString().contains('password')) {
+          errorMsg = 'Senha muito fraca. Use pelo menos 6 caracteres com letras e números';
+        } else if (e.toString().contains('network')) {
+          errorMsg = 'Erro de conexão. Verifique sua internet';
+        } else if (e.toString().contains('profiles')) {
+          errorMsg = 'Erro ao criar perfil. Verifique se o banco de dados está configurado corretamente.';
+        }
+        
         setState(() {
-          _errorMessage = 'Erro ao criar conta: ${e.toString()}';
+          _errorMessage = errorMsg;
           _isLoading = false;
         });
       }

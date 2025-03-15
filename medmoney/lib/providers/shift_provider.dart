@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/supabase_service.dart';
 
 class ShiftProvider with ChangeNotifier {
@@ -40,27 +41,26 @@ class ShiftProvider with ChangeNotifier {
     .where((shift) => shift['status'] == 'canceled')
     .length;
 
-  // Carregar plantões
+  ShiftProvider() {
+    loadShifts();
+  }
+
   Future<void> loadShifts() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _shifts = await _supabaseService.getShifts(
-        startDate: _startDateFilter,
-        endDate: _endDateFilter,
-        status: _statusFilter,
-      );
+      _shifts = await _supabaseService.getUserShifts();
     } catch (e) {
       _error = 'Erro ao carregar plantões: ${e.toString()}';
+      debugPrint(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Adicionar plantão
   Future<bool> addShift(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -72,6 +72,7 @@ class ShiftProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao adicionar plantão: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;
@@ -79,7 +80,6 @@ class ShiftProvider with ChangeNotifier {
     }
   }
 
-  // Atualizar plantão
   Future<bool> updateShift(String id, Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -91,6 +91,26 @@ class ShiftProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar plantão: ${e.toString()}';
+      debugPrint(_error);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteShift(String id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _supabaseService.deleteShift(id);
+      await loadShifts();
+      return true;
+    } catch (e) {
+      _error = 'Erro ao excluir plantão: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;

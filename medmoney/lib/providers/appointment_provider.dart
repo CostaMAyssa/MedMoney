@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/supabase_service.dart';
 
 class AppointmentProvider with ChangeNotifier {
@@ -40,6 +41,10 @@ class AppointmentProvider with ChangeNotifier {
     .where((appointment) => appointment['status'] == 'canceled')
     .length;
 
+  AppointmentProvider() {
+    loadAppointments();
+  }
+
   // Carregar consultas
   Future<void> loadAppointments() async {
     _isLoading = true;
@@ -47,13 +52,10 @@ class AppointmentProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _appointments = await _supabaseService.getAppointments(
-        startDate: _startDateFilter,
-        endDate: _endDateFilter,
-        status: _statusFilter,
-      );
+      _appointments = await _supabaseService.getUserAppointments();
     } catch (e) {
       _error = 'Erro ao carregar consultas: ${e.toString()}';
+      debugPrint(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -72,6 +74,7 @@ class AppointmentProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao adicionar consulta: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;
@@ -91,6 +94,7 @@ class AppointmentProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar consulta: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;

@@ -7,6 +7,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/responsive_container.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/routes.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -19,6 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -38,81 +40,115 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       try {
-        // Autenticação com Supabase
-        final response = await SupabaseService.signIn(
+        debugPrint('Iniciando login com email: ${_emailController.text.trim()}');
+        
+        final supabaseService = SupabaseService();
+        final response = await supabaseService.signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
 
+        debugPrint('Resposta do login: ${response.user != null ? 'Sucesso' : 'Falha'}');
+
         if (response.user != null) {
           // Login bem-sucedido
           if (mounted) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Login realizado com sucesso!'),
+                backgroundColor: AppTheme.successColor,
+              ),
+            );
+            
+            // Verificar se o usuário tem uma assinatura ativa
+            try {
+              final subscription = await supabaseService.getUserSubscription();
+              
+              if (subscription != null && subscription['status'] == 'active') {
+                // Usuário tem assinatura ativa, navegar para o dashboard
+                Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              } else {
+                // Usuário não tem assinatura ativa, navegar para a tela de pagamento
+                Navigator.pushReplacementNamed(
+                  context, 
+                  AppRoutes.payment,
+                  arguments: {
+                    'planName': 'Básico',
+                    'planType': 'monthly',
+                    'planPrice': 19.90,
+                    'setupFee': 49.90,
+                    'totalPrice': 69.80,
+                  },
+                );
+              }
+            } catch (e) {
+              debugPrint('Erro ao verificar assinatura: $e');
+              
+              // Verificar se o erro é devido à tabela inexistente
+              if (e.toString().contains('relation') && e.toString().contains('does not exist')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('É necessário configurar o banco de dados. Verifique o arquivo SUPABASE_SETUP.md para instruções.'),
+                    backgroundColor: AppTheme.warningColor,
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+              }
+              
+              // Em caso de erro, direcionar para a tela de pagamento por segurança
+              Navigator.pushReplacementNamed(
+                context, 
+                AppRoutes.payment,
+                arguments: {
+                  'planName': 'Básico',
+                  'planType': 'monthly',
+                  'planPrice': 19.90,
+                  'setupFee': 49.90,
+                  'totalPrice': 69.80,
+                },
+              );
+            }
           }
         } else {
-          // Erro de autenticação
+          // Erro no login
           setState(() {
-            _errorMessage = 'Falha na autenticação. Verifique suas credenciais.';
+            _errorMessage = 'Credenciais inválidas. Verifique seu email e senha.';
             _isLoading = false;
           });
         }
       } catch (e) {
-        // Erro durante a autenticação
+        debugPrint('Erro detalhado no login: $e');
+        
+        String errorMsg = 'Erro ao fazer login';
+        
+        // Verificar tipos específicos de erro
+        if (e.toString().contains('Email not confirmed')) {
+          errorMsg = 'Email não confirmado. Verifique sua caixa de entrada para confirmar seu email.';
+        } else if (e.toString().contains('Invalid login credentials')) {
+          errorMsg = 'Credenciais inválidas. Verifique seu email e senha.';
+        } else if (e.toString().contains('network')) {
+          errorMsg = 'Erro de conexão. Verifique sua internet.';
+        }
+        
         setState(() {
-          _errorMessage = 'Erro ao fazer login: ${e.toString()}';
+          _errorMessage = errorMsg;
           _isLoading = false;
         });
       }
     }
   }
 
-  Future<void> _resetPassword() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      setState(() {
-        _errorMessage = 'Por favor, informe seu email para redefinir a senha.';
-      });
-      return;
-    }
-
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-
-      await SupabaseService.resetPassword(email);
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email de redefinição de senha enviado. Verifique sua caixa de entrada.'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Erro ao enviar email de redefinição: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
             // Cabeçalho
             AppHeader(
               onRegisterPressed: () {
-                Navigator.pushNamed(context, '/register');
+                Navigator.pushNamed(context, AppRoutes.register);
               },
             ),
             
@@ -123,48 +159,260 @@ class _LoginPageState extends State<LoginPage> {
                 vertical: 64,
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Formulário de login
-                  Expanded(
-                    flex: Responsive.isMobile(context) ? 1 : 1,
-                    child: _buildLoginForm(context),
-                  ),
-                  
-                  // Imagem lateral (apenas para desktop)
-                  if (!Responsive.isMobile(context)) ...[
-                    const SizedBox(width: 64),
+                  // Seção de boas-vindas (visível apenas em desktop)
+                  if (!Responsive.isMobile(context))
                     Expanded(
-                      flex: 1,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Bem-vindo de volta!',
                             style: TextStyle(
-                              fontSize: 32,
+                              fontSize: 40,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.textPrimaryColor,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
                           Text(
                             'Acesse sua conta para continuar gerenciando suas finanças e plantões de forma eficiente.',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 18,
                               color: AppTheme.textSecondaryColor,
-                              height: 1.5,
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          Image.network(
-                            'https://via.placeholder.com/600x400?text=Login+Illustration',
-                            width: double.infinity,
+                          const SizedBox(height: 48),
+                          // Ícone médico em vez da imagem
+                          Container(
+                            width: 300,
+                            height: 300,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.medical_services_outlined,
+                                size: 150,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                  
+                  if (!Responsive.isMobile(context))
+                    const SizedBox(width: 64),
+                  
+                  // Formulário de login
+                  Expanded(
+                    child: Card(
+                      elevation: 4,
+                      color: Color(0xFF1A1A4F), // Cor escura para o fundo do card
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Entrar',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Informe seus dados para acessar sua conta',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: AppTheme.textSecondaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            
+                            // Mensagem de erro (se houver)
+                            if (_errorMessage != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.errorColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: AppTheme.errorColor,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: TextStyle(
+                                          color: AppTheme.errorColor,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            
+                            // Formulário de login
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Email',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  CustomTextField(
+                                    hint: 'Seu email',
+                                    controller: _emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    prefixIcon: Icons.email,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Por favor, informe seu email';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    'Senha',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  CustomTextField(
+                                    hint: 'Sua senha',
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    prefixIcon: Icons.lock,
+                                    suffixIcon: _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                    onSuffixIconPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Por favor, informe sua senha';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () {
+                                        // Implementar recuperação de senha
+                                      },
+                                      child: Text(
+                                        'Esqueceu sua senha?',
+                                        style: TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: CustomButton(
+                                      text: 'Entrar',
+                                      onPressed: _login,
+                                      type: ButtonType.primary,
+                                      size: ButtonSize.large,
+                                      isLoading: _isLoading,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  
+                                  // Divisor
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Divider(
+                                          color: AppTheme.textSecondaryColor.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        child: Text(
+                                          'ou',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Divider(
+                                          color: AppTheme.textSecondaryColor.withOpacity(0.3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  
+                                  const SizedBox(height: 24),
+                                  
+                                  // Link para criar conta
+                                  Center(
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Não tem uma conta?',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondaryColor,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.pushNamed(context, AppRoutes.register);
+                                          },
+                                          child: Text(
+                                            'Criar conta',
+                                            style: TextStyle(
+                                              color: AppTheme.primaryColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -172,182 +420,6 @@ class _LoginPageState extends State<LoginPage> {
             // Rodapé
             const AppFooter(),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoginForm(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Entrar',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Informe seus dados para acessar sua conta',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.textSecondaryColor,
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              // Mensagem de erro (se houver)
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: AppTheme.errorColor,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: AppTheme.errorColor,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-              
-              CustomTextField(
-                label: 'Email',
-                hint: 'Seu email',
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                prefixIcon: Icons.email,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, informe seu email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                    return 'Por favor, informe um email válido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              CustomTextField(
-                label: 'Senha',
-                hint: 'Sua senha',
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                prefixIcon: Icons.lock,
-                suffixIcon: _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                onSuffixIconPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, informe sua senha';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _resetPassword,
-                  child: Text(
-                    'Esqueceu sua senha?',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              CustomButton(
-                text: 'Entrar',
-                onPressed: _login,
-                type: ButtonType.primary,
-                size: ButtonSize.large,
-                isLoading: _isLoading,
-                fullWidth: true,
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Divider(
-                      color: AppTheme.textSecondaryColor.withOpacity(0.3),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'ou',
-                      style: TextStyle(
-                        color: AppTheme.textSecondaryColor,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(
-                      color: AppTheme.textSecondaryColor.withOpacity(0.3),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Não tem uma conta?',
-                    style: TextStyle(
-                      color: AppTheme.textSecondaryColor,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/register');
-                    },
-                    child: Text(
-                      'Criar conta',
-                      style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );

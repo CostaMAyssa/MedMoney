@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/supabase_service.dart';
 
 class TransactionProvider with ChangeNotifier {
@@ -35,44 +36,43 @@ class TransactionProvider with ChangeNotifier {
 
   double get balance => totalIncome - totalExpense;
 
-  // Carregar transações
+  TransactionProvider() {
+    loadTransactions();
+    loadCategories();
+  }
+
   Future<void> loadTransactions() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _transactions = await _supabaseService.getTransactions(
-        type: _typeFilter,
-        category: _categoryFilter,
-        startDate: _startDateFilter,
-        endDate: _endDateFilter,
-      );
+      _transactions = await _supabaseService.getUserTransactions();
     } catch (e) {
       _error = 'Erro ao carregar transações: ${e.toString()}';
+      debugPrint(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Carregar categorias
-  Future<void> loadCategories({String? type}) async {
+  Future<void> loadCategories() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _categories = await _supabaseService.getCategories(type: type);
+      _categories = await _supabaseService.getCategories();
     } catch (e) {
       _error = 'Erro ao carregar categorias: ${e.toString()}';
+      debugPrint(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Adicionar transação
   Future<bool> addTransaction(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -84,6 +84,7 @@ class TransactionProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao adicionar transação: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;
@@ -91,7 +92,6 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Atualizar transação
   Future<bool> updateTransaction(String id, Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -103,6 +103,7 @@ class TransactionProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar transação: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;
@@ -110,7 +111,6 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Excluir transação
   Future<bool> deleteTransaction(String id) async {
     _isLoading = true;
     _error = null;
@@ -122,6 +122,7 @@ class TransactionProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao excluir transação: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;
@@ -129,7 +130,6 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  // Adicionar categoria
   Future<bool> addCategory(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -141,6 +141,7 @@ class TransactionProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Erro ao adicionar categoria: ${e.toString()}';
+      debugPrint(_error);
       return false;
     } finally {
       _isLoading = false;

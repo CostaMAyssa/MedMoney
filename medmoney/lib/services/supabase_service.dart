@@ -8,15 +8,30 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
+  late final SupabaseClient _client;
+  
+  // Método de inicialização como método de instância
+  Future<void> initialize() async {
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseKey = dotenv.env['SUPABASE_KEY'] ?? '';
+    
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+    );
+    
+    _client = Supabase.instance.client;
+  }
+  
+  // Método para obter o cliente Supabase
+  SupabaseClient get client => Supabase.instance.client;
+
   // Credenciais do Supabase
   static String get supabaseUrl => dotenv.env['SUPABASE_URL'] ?? 'https://rwotvxqknrjurqrhxhjv.supabase.co';
   static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M';
   
-  // Cliente Supabase
-  SupabaseClient get client => Supabase.instance.client;
-  
   // Inicializar o Supabase
-  static Future<void> initialize() async {
+  static Future<void> initializeStatic() async {
     try {
       await Supabase.initialize(
         url: supabaseUrl,
@@ -31,13 +46,16 @@ class SupabaseService {
   }
   
   // Autenticação
-  static Future<AuthResponse> signUp({
+  Future<AuthResponse> signUp({
     required String email,
     required String password,
     required String name,
     String? phone,
   }) async {
     try {
+      debugPrint('Iniciando processo de criação de conta para: $email');
+      
+      // Registrar o usuário no Supabase Auth
       final response = await client.auth.signUp(
         email: email,
         password: password,
@@ -47,85 +65,62 @@ class SupabaseService {
         },
       );
       
-      // Se o registro for bem-sucedido, criar o perfil do usuário
+      debugPrint('Resposta do Supabase: ${response.user != null ? 'Usuário criado' : 'Falha na criação do usuário'}');
+      
+      // Se o usuário foi criado com sucesso, tentar criar o perfil
+      // Mas não falhar se o perfil não puder ser criado
       if (response.user != null) {
-        await _createUserProfile(response.user!.id, {
-          'name': name,
-          'phone': phone,
-        });
+        debugPrint('Usuário criado com sucesso: ${response.user!.id}');
+        
+        try {
+          // Tentar criar o perfil, mas não falhar se não conseguir
+          await client.from('profiles').insert({
+            'id': response.user!.id,
+            'name': name,
+            'email': email,
+            'phone': phone,
+            'created_at': DateTime.now().toIso8601String(),
+          }).execute();
+          
+          debugPrint('Perfil criado com sucesso');
+        } catch (profileError) {
+          // Ignorar erros ao criar o perfil
+          debugPrint('Erro ao criar perfil (ignorado): $profileError');
+          debugPrint('O usuário foi criado com sucesso, mas o perfil não pôde ser criado.');
+          debugPrint('Isso pode acontecer se a tabela "profiles" não existir no banco de dados.');
+          debugPrint('Execute o script SQL fornecido para criar as tabelas necessárias.');
+        }
       }
       
       return response;
     } catch (e) {
-      debugPrint('Erro no cadastro: $e');
+      debugPrint('Erro detalhado ao criar conta: $e');
       rethrow;
     }
   }
   
-  // Criar perfil do usuário após o registro
-  static Future<void> _createUserProfile(String userId, Map<String, dynamic> userData) async {
-    try {
-      await client.from('profiles').insert({
-        'id': userId,
-        'name': userData['name'] ?? '',
-        'phone': userData['phone'] ?? '',
-        'city': userData['city'] ?? '',
-        'state': userData['state'] ?? '',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-      
-      // Criar assinatura do usuário
-      await _createSubscription(userId, userData);
-    } catch (e) {
-      debugPrint('Erro ao criar perfil do usuário: $e');
-      rethrow;
-    }
-  }
-  
-  // Criar assinatura do usuário
-  static Future<void> _createSubscription(String userId, Map<String, dynamic> userData) async {
-    try {
-      final planType = userData['plan_type'] ?? 'monthly';
-      final planName = userData['plan'] ?? 'Básico';
-      final planPrice = userData['plan_price'] ?? 19.90;
-      
-      await client.from('subscriptions').insert({
-        'user_id': userId,
-        'plan_name': planName,
-        'plan_type': planType,
-        'price': planPrice,
-        'status': 'pending', // Aguardando pagamento
-        'start_date': DateTime.now().toIso8601String(),
-        'next_billing_date': planType == 'annual' 
-            ? DateTime.now().add(const Duration(days: 365)).toIso8601String()
-            : DateTime.now().add(const Duration(days: 30)).toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('Erro ao criar assinatura: $e');
-      rethrow;
-    }
-  }
-  
-  static Future<AuthResponse> signIn({
+  Future<AuthResponse> signIn({
     required String email,
     required String password,
   }) async {
     try {
+      debugPrint('Iniciando processo de login para: $email');
+      
       final response = await client.auth.signInWithPassword(
         email: email,
         password: password,
       );
+      
+      debugPrint('Resposta do login: ${response.user != null ? 'Login bem-sucedido' : 'Falha no login'}');
+      
       return response;
     } catch (e) {
-      debugPrint('Erro no login: $e');
+      debugPrint('Erro detalhado ao fazer login: $e');
       rethrow;
     }
   }
   
-  static Future<void> signOut() async {
+  Future<void> signOut() async {
     try {
       await client.auth.signOut();
     } catch (e) {
@@ -134,30 +129,14 @@ class SupabaseService {
     }
   }
   
-  static Future<void> resetPassword(String email) async {
+  // Perfil do usuário
+  Future<Map<String, dynamic>> getUserProfile() async {
     try {
-      await client.auth.resetPasswordForEmail(email);
-    } catch (e) {
-      debugPrint('Erro ao redefinir senha: $e');
-      rethrow;
-    }
-  }
-  
-  // Verificar se o usuário está autenticado
-  static bool isAuthenticated() {
-    return client.auth.currentUser != null;
-  }
-  
-  // Obter o usuário atual
-  static User? getCurrentUser() {
-    return client.auth.currentUser;
-  }
-  
-  // Obter perfil do usuário
-  static Future<Map<String, dynamic>?> getUserProfile() async {
-    try {
-      final userId = getCurrentUser()?.id;
-      if (userId == null) return null;
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
       
       final response = await client
           .from('profiles')
@@ -165,428 +144,441 @@ class SupabaseService {
           .eq('id', userId)
           .single();
       
-      return response;
+      return response as Map<String, dynamic>;
     } catch (e) {
-      debugPrint('Erro ao buscar perfil do usuário: $e');
-      return null;
+      debugPrint('Erro ao obter perfil: $e');
+      rethrow;
     }
   }
   
-  // Obter assinatura do usuário
-  static Future<Map<String, dynamic>?> getUserSubscription() async {
+  Future<void> updateUserProfile(Map<String, dynamic> data) async {
     try {
-      final userId = getCurrentUser()?.id;
-      if (userId == null) return null;
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      await client
+          .from('profiles')
+          .update(data)
+          .eq('id', userId);
+      
+    } catch (e) {
+      debugPrint('Erro ao atualizar perfil: $e');
+      rethrow;
+    }
+  }
+  
+  // Assinaturas
+  Future<Map<String, dynamic>?> getUserSubscription() async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
       
       final response = await client
           .from('subscriptions')
           .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false)
-          .limit(1)
-          .single();
+          .limit(1);
       
-      return response;
+      final data = response as List;
+      
+      if (data.isEmpty) {
+        return null;
+      }
+      
+      return data.first as Map<String, dynamic>;
     } catch (e) {
-      debugPrint('Erro ao buscar assinatura do usuário: $e');
-      return null;
+      debugPrint('Erro ao obter assinatura: $e');
+      rethrow;
     }
   }
   
-  // Atualizar assinatura do usuário
-  static Future<void> updateSubscription(Map<String, dynamic> subscriptionData) async {
+  Future<void> createSubscription(Map<String, dynamic> data) async {
     try {
-      final userId = getCurrentUser()?.id;
-      if (userId == null) return;
+      final userId = client.auth.currentUser?.id;
       
-      final subscription = await getUserSubscription();
-      if (subscription == null) return;
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      data['user_id'] = userId;
+      data['created_at'] = DateTime.now().toIso8601String();
       
       await client
           .from('subscriptions')
-          .update({
-            ...subscriptionData,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', subscription['id']);
+          .insert(data);
+      
+    } catch (e) {
+      debugPrint('Erro ao criar assinatura: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> updateSubscription(String id, Map<String, dynamic> data) async {
+    try {
+      await client
+          .from('subscriptions')
+          .update(data)
+          .eq('id', id);
+      
     } catch (e) {
       debugPrint('Erro ao atualizar assinatura: $e');
       rethrow;
     }
   }
   
-  // Processar pagamento
-  static Future<Map<String, dynamic>> processPayment({
-    required String paymentMethod,
-    required double amount,
-    required String description,
-  }) async {
+  // Planos
+  Future<List<Map<String, dynamic>>> getPlans() async {
     try {
-      final userId = getCurrentUser()?.id;
+      final response = await client
+          .from('plans')
+          .select()
+          .order('price', ascending: true);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Erro ao obter planos: $e');
+      rethrow;
+    }
+  }
+  
+  // Transações
+  Future<void> createTransaction(Map<String, dynamic> data) async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
       if (userId == null) {
         throw Exception('Usuário não autenticado');
       }
       
-      // Este método está sendo substituído pelo AsaasService
-      // Mantido apenas para compatibilidade com código existente
-      debugPrint('Aviso: Este método está sendo substituído pelo AsaasService');
+      data['user_id'] = userId;
+      data['created_at'] = DateTime.now().toIso8601String();
       
-      // Simular processamento de pagamento
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Registrar o pagamento no banco de dados
-      final paymentData = {
-        'user_id': userId,
-        'payment_method': paymentMethod,
-        'amount': amount,
-        'description': description,
-        'status': 'completed',
-        'created_at': DateTime.now().toIso8601String(),
-      };
-      
-      final response = await client
-          .from('payments')
-          .insert(paymentData)
-          .select()
-          .single();
-      
-      // Atualizar status da assinatura
-      await updateSubscription({
-        'status': 'active',
-        'last_payment_date': DateTime.now().toIso8601String(),
-      });
-      
-      return response;
-    } catch (e) {
-      debugPrint('Erro ao processar pagamento: $e');
-      rethrow;
-    }
-  }
-  
-  // CRUD para transações financeiras
-  static Future<List<Map<String, dynamic>>> getTransactions() async {
-    try {
-      final response = await client
+      await client
           .from('transactions')
-          .select()
-          .eq('user_id', getCurrentUser()?.id)
-          .order('date', ascending: false);
+          .insert(data);
       
-      return response;
     } catch (e) {
-      debugPrint('Erro ao buscar transações: $e');
+      debugPrint('Erro ao criar transação: $e');
       rethrow;
     }
   }
   
-  static Future<void> addTransaction(Map<String, dynamic> transactionData) async {
-    try {
-      await client.from('transactions').insert({
-        ...transactionData,
-        'user_id': getCurrentUser()?.id,
-      });
-    } catch (e) {
-      debugPrint('Erro ao adicionar transação: $e');
-      rethrow;
-    }
-  }
-  
-  static Future<void> updateTransaction(
-    String id,
-    Map<String, dynamic> transactionData,
-  ) async {
+  Future<void> updateTransaction(String id, Map<String, dynamic> data) async {
     try {
       await client
           .from('transactions')
-          .update(transactionData)
-          .eq('id', id)
-          .eq('user_id', getCurrentUser()?.id);
+          .update(data)
+          .eq('id', id);
+      
     } catch (e) {
       debugPrint('Erro ao atualizar transação: $e');
       rethrow;
     }
   }
   
-  static Future<void> deleteTransaction(String id) async {
+  Future<void> deleteTransaction(String id) async {
     try {
       await client
           .from('transactions')
           .delete()
-          .eq('id', id)
-          .eq('user_id', getCurrentUser()?.id);
+          .eq('id', id);
+      
     } catch (e) {
       debugPrint('Erro ao excluir transação: $e');
       rethrow;
     }
   }
-
-  // Perfil do usuário
-  Future<void> updateUserProfile(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    await client
-        .from('profiles')
-        .update(data)
-        .eq('id', user.id);
-  }
-
-  // Planos
-  Future<List<Map<String, dynamic>>> getPlans() async {
-    final response = await client
-        .from('plans')
-        .select()
-        .eq('is_active', true);
-    
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  // Assinaturas
-  Future<Map<String, dynamic>?> getCurrentSubscription() async {
-    final user = client.auth.currentUser;
-    if (user == null) return null;
-
-    final response = await client
-        .from('subscriptions')
-        .select('*, plans(*)')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-    
-    return response;
-  }
-
-  Future<void> createSubscription(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    data['user_id'] = user.id;
-    
-    await client
-        .from('subscriptions')
-        .insert(data);
-  }
-
-  // Transações
-  Future<List<Map<String, dynamic>>> getTransactions({
-    String? type,
-    String? category,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final user = client.auth.currentUser;
-    if (user == null) return [];
-
-    var query = client
-        .from('transactions')
-        .select('*, categories(*)')
-        .eq('user_id', user.id)
-        .order('date', ascending: false);
-    
-    if (type != null) {
-      query = query.eq('type', type);
+  
+  Future<List<Map<String, dynamic>>> getUserTransactions() async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      final response = await client
+          .from('transactions')
+          .select()
+          .eq('user_id', userId)
+          .order('date', ascending: false);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Erro ao obter transações: $e');
+      rethrow;
     }
-    
-    if (category != null) {
-      query = query.eq('category', category);
-    }
-    
-    if (startDate != null) {
-      query = query.gte('date', startDate.toIso8601String());
-    }
-    
-    if (endDate != null) {
-      query = query.lte('date', endDate.toIso8601String());
-    }
-    
-    final response = await query;
-    return List<Map<String, dynamic>>.from(response);
   }
-
-  Future<void> createTransaction(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    data['user_id'] = user.id;
-    
-    await client
-        .from('transactions')
-        .insert(data);
-  }
-
-  Future<void> updateTransaction(String id, Map<String, dynamic> data) async {
-    await client
-        .from('transactions')
-        .update(data)
-        .eq('id', id);
-  }
-
-  Future<void> deleteTransaction(String id) async {
-    await client
-        .from('transactions')
-        .delete()
-        .eq('id', id);
-  }
-
+  
   // Categorias
-  Future<List<Map<String, dynamic>>> getCategories({String? type}) async {
-    final user = client.auth.currentUser;
-    if (user == null) return [];
-
-    var query = client
-        .from('categories')
-        .select()
-        .or('is_default.eq.true,user_id.eq.${user.id}');
-    
-    if (type != null) {
-      query = query.eq('type', type);
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    try {
+      final response = await client
+          .from('categories')
+          .select()
+          .order('name', ascending: true);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Erro ao obter categorias: $e');
+      rethrow;
     }
-    
-    final response = await query;
-    return List<Map<String, dynamic>>.from(response);
   }
-
+  
   Future<void> createCategory(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    data['user_id'] = user.id;
-    data['is_default'] = false;
-    
-    await client
-        .from('categories')
-        .insert(data);
-  }
-
-  // Plantões
-  Future<List<Map<String, dynamic>>> getShifts({
-    DateTime? startDate,
-    DateTime? endDate,
-    String? status,
-  }) async {
-    final user = client.auth.currentUser;
-    if (user == null) return [];
-
-    var query = client
-        .from('shifts')
-        .select()
-        .eq('user_id', user.id)
-        .order('start_time', ascending: false);
-    
-    if (status != null) {
-      query = query.eq('status', status);
-    }
-    
-    if (startDate != null) {
-      query = query.gte('start_time', startDate.toIso8601String());
-    }
-    
-    if (endDate != null) {
-      query = query.lte('start_time', endDate.toIso8601String());
-    }
-    
-    final response = await query;
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  Future<void> createShift(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    data['user_id'] = user.id;
-    
-    await client
-        .from('shifts')
-        .insert(data);
-  }
-
-  Future<void> updateShift(String id, Map<String, dynamic> data) async {
-    await client
-        .from('shifts')
-        .update(data)
-        .eq('id', id);
-  }
-
-  // Consultas
-  Future<List<Map<String, dynamic>>> getAppointments({
-    DateTime? startDate,
-    DateTime? endDate,
-    String? status,
-  }) async {
-    final user = client.auth.currentUser;
-    if (user == null) return [];
-
-    var query = client
-        .from('appointments')
-        .select()
-        .eq('user_id', user.id)
-        .order('appointment_time', ascending: false);
-    
-    if (status != null) {
-      query = query.eq('status', status);
-    }
-    
-    if (startDate != null) {
-      query = query.gte('appointment_time', startDate.toIso8601String());
-    }
-    
-    if (endDate != null) {
-      query = query.lte('appointment_time', endDate.toIso8601String());
-    }
-    
-    final response = await query;
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  Future<void> createAppointment(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    data['user_id'] = user.id;
-    
-    await client
-        .from('appointments')
-        .insert(data);
-  }
-
-  Future<void> updateAppointment(String id, Map<String, dynamic> data) async {
-    await client
-        .from('appointments')
-        .update(data)
-        .eq('id', id);
-  }
-
-  // Configurações do usuário
-  Future<Map<String, dynamic>?> getUserSettings() async {
-    final user = client.auth.currentUser;
-    if (user == null) return null;
-
-    final response = await client
-        .from('user_settings')
-        .select()
-        .eq('user_id', user.id)
-        .maybeSingle();
-    
-    return response;
-  }
-
-  Future<void> updateUserSettings(Map<String, dynamic> data) async {
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    // Verificar se já existem configurações
-    final settings = await getUserSettings();
-    
-    if (settings == null) {
-      // Criar novas configurações
-      data['user_id'] = user.id;
-      await client.from('user_settings').insert(data);
-    } else {
-      // Atualizar configurações existentes
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      data['user_id'] = userId;
+      data['created_at'] = DateTime.now().toIso8601String();
+      
       await client
-          .from('user_settings')
+          .from('categories')
+          .insert(data);
+      
+    } catch (e) {
+      debugPrint('Erro ao criar categoria: $e');
+      rethrow;
+    }
+  }
+  
+  // Plantões
+  Future<void> createShift(Map<String, dynamic> data) async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      data['user_id'] = userId;
+      data['created_at'] = DateTime.now().toIso8601String();
+      
+      await client
+          .from('shifts')
+          .insert(data);
+      
+    } catch (e) {
+      debugPrint('Erro ao criar plantão: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> updateShift(String id, Map<String, dynamic> data) async {
+    try {
+      await client
+          .from('shifts')
           .update(data)
-          .eq('user_id', user.id);
+          .eq('id', id);
+      
+    } catch (e) {
+      debugPrint('Erro ao atualizar plantão: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> deleteShift(String id) async {
+    try {
+      await client
+          .from('shifts')
+          .delete()
+          .eq('id', id);
+      
+    } catch (e) {
+      debugPrint('Erro ao excluir plantão: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<Map<String, dynamic>>> getUserShifts() async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      final response = await client
+          .from('shifts')
+          .select()
+          .eq('user_id', userId)
+          .order('date', ascending: false);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Erro ao obter plantões: $e');
+      rethrow;
+    }
+  }
+  
+  // Consultas
+  Future<void> createAppointment(Map<String, dynamic> data) async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      data['user_id'] = userId;
+      data['created_at'] = DateTime.now().toIso8601String();
+      
+      await client
+          .from('appointments')
+          .insert(data);
+      
+    } catch (e) {
+      debugPrint('Erro ao criar consulta: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> updateAppointment(String id, Map<String, dynamic> data) async {
+    try {
+      await client
+          .from('appointments')
+          .update(data)
+          .eq('id', id);
+      
+    } catch (e) {
+      debugPrint('Erro ao atualizar consulta: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> deleteAppointment(String id) async {
+    try {
+      await client
+          .from('appointments')
+          .delete()
+          .eq('id', id);
+      
+    } catch (e) {
+      debugPrint('Erro ao excluir consulta: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<Map<String, dynamic>>> getUserAppointments() async {
+    try {
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      final response = await client
+          .from('appointments')
+          .select()
+          .eq('user_id', userId)
+          .order('date', ascending: false);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Erro ao obter consultas: $e');
+      rethrow;
+    }
+  }
+
+  // Método para inicializar o banco de dados
+  Future<void> initializeDatabase() async {
+    try {
+      debugPrint('Verificando tabelas existentes...');
+      
+      // Verificar tabelas existentes
+      final profilesExist = await _checkTableExists('profiles');
+      final plansExist = await _checkTableExists('plans');
+      final subscriptionsExist = await _checkTableExists('subscriptions');
+      final transactionsExist = await _checkTableExists('transactions');
+      
+      debugPrint('Tabelas existentes: profiles=${profilesExist}, plans=${plansExist}, subscriptions=${subscriptionsExist}, transactions=${transactionsExist}');
+      
+      // Inserir planos padrão se a tabela de planos existir mas estiver vazia
+      if (plansExist) {
+        final plans = await getPlans();
+        if (plans.isEmpty) {
+          await _insertDefaultPlans();
+        }
+      }
+      
+      debugPrint('Inicialização do banco de dados concluída com sucesso!');
+    } catch (e) {
+      debugPrint('Erro ao verificar banco de dados: $e');
+      // Não lançar exceção para não interromper o fluxo do aplicativo
+    }
+  }
+  
+  // Verificar se uma tabela existe
+  Future<bool> _checkTableExists(String tableName) async {
+    try {
+      // Tentar fazer uma consulta simples na tabela
+      await client.from(tableName).select('id').limit(1);
+      return true;
+    } catch (e) {
+      if (e.toString().contains('relation') && e.toString().contains('does not exist')) {
+        return false;
+      }
+      // Para outros erros, considerar que a tabela existe
+      return true;
+    }
+  }
+  
+  // Inserir planos padrão
+  Future<void> _insertDefaultPlans() async {
+    try {
+      debugPrint('Inserindo planos padrão...');
+      
+      // Plano Básico Mensal
+      await client.from('plans').insert({
+        'name': 'Básico',
+        'type': 'monthly',
+        'price': 19.90,
+        'description': 'Bot no WhatsApp',
+        'features': ['Bot no WhatsApp', 'Suporte por email'],
+      });
+      
+      // Plano Básico Anual
+      await client.from('plans').insert({
+        'name': 'Básico',
+        'type': 'annual',
+        'price': 199.00,
+        'description': 'Bot no WhatsApp',
+        'features': ['Bot no WhatsApp', 'Suporte por email'],
+      });
+      
+      // Plano Premium Mensal
+      await client.from('plans').insert({
+        'name': 'Premium',
+        'type': 'monthly',
+        'price': 29.90,
+        'description': 'Bot + Dashboard',
+        'features': ['Bot no WhatsApp', 'Dashboard completo', 'Suporte prioritário'],
+      });
+      
+      // Plano Premium Anual
+      await client.from('plans').insert({
+        'name': 'Premium',
+        'type': 'annual',
+        'price': 299.00,
+        'description': 'Bot + Dashboard',
+        'features': ['Bot no WhatsApp', 'Dashboard completo', 'Suporte prioritário'],
+      });
+      
+      debugPrint('Planos padrão inseridos com sucesso!');
+    } catch (e) {
+      debugPrint('Erro ao inserir planos padrão: $e');
+      // Não lançar exceção para não interromper o fluxo
     }
   }
 } 

@@ -2,81 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Cores principais
-  static const Color primaryColor = Color(0xFF4A6FE5);
-  static const Color secondaryColor = Color(0xFF6C63FF);
-  static const Color accentColor = Color(0xFF00D9F5);
+  // Cores principais conforme especificação
+  static const Color primaryColor = Color(0xFF48B7A2); // Verde Água para botões e filtros
+  static const Color secondaryColor = Color(0xFFB9A6F5); // Lilás para painel de destaque
+  static const Color backgroundColor = Color(0xFF0A0A3E); // Azul Escuro para fundo principal
+  static const Color surfaceColor = Color(0xFFFFFFFF); // Branco para texto e detalhes
+  static const Color errorColor = Color(0xFFFF6B6B); // Vermelho para erros
+  static const Color successColor = Color(0xFF16A34A);
+  static const Color warningColor = Color(0xFFD97706);
   
-  // Cores de fundo
-  static const Color backgroundColor = Color(0xFFF8F9FA);
-  static const Color cardColor = Colors.white;
-  static const Color darkBackgroundColor = Color(0xFF1A1A4F);
-  static const Color darkCardColor = Color(0xFF2A2A5F);
+  // Cores para texto
+  static const Color textPrimaryColor = Color(0xFFFFFFFF); // Branco para texto principal
+  static const Color textSecondaryColor = Color(0xFFE0E0E0); // Cinza claro para texto secundário
+  static const Color textTertiaryColor = Color(0xFFB0B0B0); // Cinza mais claro para texto terciário
   
-  // Cores de texto
-  static const Color textPrimaryColor = Color(0xFF2D3748);
-  static const Color textSecondaryColor = Color(0xFF718096);
-  static const Color darkTextPrimaryColor = Colors.white;
-  static const Color darkTextSecondaryColor = Color(0xFFCBD5E0);
-  
-  // Cores de status
-  static const Color successColor = Color(0xFF48BB78);
-  static const Color warningColor = Color(0xFFECC94B);
-  static const Color errorColor = Color(0xFFE53E3E);
-  static const Color infoColor = Color(0xFF4299E1);
-  
-  // Cores de borda
-  static const Color borderColor = Color(0xFFE2E8F0);
-  static const Color darkBorderColor = Color(0xFF3A3A6F);
-  
-  // Gradientes
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primaryColor, secondaryColor],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  
-  static const LinearGradient accentGradient = LinearGradient(
-    colors: [secondaryColor, accentColor],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  
-  // Sombras
-  static List<BoxShadow> get cardShadow => [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.1),
-      blurRadius: 10,
-      offset: const Offset(0, 4),
-    ),
-  ];
-  
-  static List<BoxShadow> get buttonShadow => [
-    BoxShadow(
-      color: primaryColor.withOpacity(0.3),
-      blurRadius: 8,
-      offset: const Offset(0, 4),
-    ),
-  ];
-  
-  // Espaçamento
-  static const double spacing = 8.0;
-  static const double spacingSmall = 4.0;
-  static const double spacingMedium = 16.0;
-  static const double spacingLarge = 24.0;
-  static const double spacingXLarge = 32.0;
-  static const double spacingXXLarge = 48.0;
-  
-  // Raios de borda
-  static const double borderRadiusSmall = 4.0;
-  static const double borderRadiusMedium = 8.0;
-  static const double borderRadiusLarge = 16.0;
-  static const double borderRadiusXLarge = 24.0;
-  
-  // Duração de animações
-  static const Duration animationDurationFast = Duration(milliseconds: 200);
-  static const Duration animationDurationMedium = Duration(milliseconds: 300);
-  static const Duration animationDurationSlow = Duration(milliseconds: 500);
+  // Cores para status financeiro
+  static const Color incomeColor = Color(0xFF48B7A2); // Verde Água para receitas
+  static const Color expenseColor = Color(0xFFFF6B6B); // Vermelho para despesas
+  static const Color neutralColor = Color(0xFFB9A6F5); // Lilás para neutro
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -152,7 +95,7 @@ class AppTheme {
           fontWeight: FontWeight.normal,
         ),
         bodySmall: GoogleFonts.montserrat(
-          color: textSecondaryColor,
+          color: textTertiaryColor,
           fontSize: 12,
           fontWeight: FontWeight.normal,
         ),
@@ -167,7 +110,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
         labelSmall: GoogleFonts.montserrat(
-          color: textSecondaryColor,
+          color: textTertiaryColor,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
