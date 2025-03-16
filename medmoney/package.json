@@ -4,7 +4,11 @@
   "description": "Backend para o MedMoney",
   "scripts": {
     "setup-supabase": "node setup_supabase.js",
-    "start-webhook": "node webhook_handler.js"
+    "start-webhook": "node webhook_handler.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "webhook": "node start_webhook.js",
+    "test-backend": "node test_backend.js",
+    "test-webhook": "node test_webhook.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -13,9 +17,12 @@
     "express": "^4.18.2"
   },
   "devDependencies": {
+    "axios": "^1.8.3",
+    "localtunnel": "^2.0.2",
+    "ngrok": "^5.0.0-beta.2",
     "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
   }
-} 
+}
