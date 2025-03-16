@@ -118,8 +118,6 @@ class _PaymentPageState extends State<PaymentPage> {
             MaterialPageRoute(
               builder: (context) => PixPaymentPage(
                 pixInfo: paymentProvider.pixData!,
-                planName: widget.planName,
-                planType: widget.planType,
               ),
             ),
           );
