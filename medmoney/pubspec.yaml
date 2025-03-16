@@ -40,6 +40,7 @@ dependencies:
   lottie: ^3.3.1
   flutter_credit_card: ^4.0.1
   mask_text_input_formatter: ^2.5.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
