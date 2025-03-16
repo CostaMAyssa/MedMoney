@@ -237,7 +237,7 @@ class _PixPaymentPageState extends State<PixPaymentPage> {
             ),
             
             // Rodapé
-            AppFooter(),
+            const AppFooter(),
           ],
         ),
       ),

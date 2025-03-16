@@ -10,6 +10,7 @@ class AppTheme {
   static const Color errorColor = Color(0xFFFF6B6B); // Vermelho para erros
   static const Color successColor = Color(0xFF16A34A);
   static const Color warningColor = Color(0xFFD97706);
+  static const Color cardBackgroundColor = Color(0xFF1A1A4F); // Cor para cards e containers
   
   // Cores para texto
   static const Color textPrimaryColor = Color(0xFFFFFFFF); // Branco para texto principal

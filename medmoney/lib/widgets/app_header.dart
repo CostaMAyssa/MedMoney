@@ -10,6 +10,7 @@ class AppHeader extends StatelessWidget {
   final VoidCallback? onDashboardPressed;
   final bool showLogo;
   final bool isTransparent;
+  final bool showBackButton;
 
   const AppHeader({
     Key? key,
@@ -20,6 +21,7 @@ class AppHeader extends StatelessWidget {
     this.onDashboardPressed,
     this.showLogo = true,
     this.isTransparent = false,
+    this.showBackButton = false,
   }) : super(key: key);
 
   @override
@@ -43,14 +45,23 @@ class AppHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              InkWell(
-                onTap: () => Navigator.pushReplacementNamed(context, '/'),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  height: Responsive.isMobile(context) ? 60 : 80,
-                  fit: BoxFit.contain,
+              if (showBackButton)
+                IconButton(
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ),
+              if (showLogo)
+                InkWell(
+                  onTap: () => Navigator.pushReplacementNamed(context, '/'),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    height: Responsive.isMobile(context) ? 60 : 80,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               if (!Responsive.isMobile(context)) ...[
                 const SizedBox(width: 48),
                 _buildNavMenu(context),
