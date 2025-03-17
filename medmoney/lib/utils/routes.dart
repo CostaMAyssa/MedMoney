@@ -6,6 +6,8 @@ import '../screens/auth/login_page.dart';
 import '../screens/auth/register_page.dart';
 import '../screens/dashboard/dashboard_page.dart';
 import '../screens/payment_page.dart';
+import '../screens/payment_required_page.dart';
+import '../middlewares/payment_check_middleware.dart';
 
 class AppRoutes {
   // Definição das rotas
@@ -15,13 +17,16 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String splash = '/splash';
   static const String payment = '/payment';
+  static const String paymentRequired = '/payment-required';
 
   // Mapa de rotas
   static final Map<String, WidgetBuilder> routes = {
     home: (context) => const HomePage(),
     login: (context) => const LoginPage(),
     register: (context) => const RegisterPage(),
-    dashboard: (context) => const DashboardPage(),
+    dashboard: (context) => const PaymentCheckMiddleware(
+      child: DashboardPage(),
+    ),
     splash: (context) => const SplashScreen(),
     payment: (context) {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
@@ -33,5 +38,6 @@ class AppRoutes {
         totalPrice: args['totalPrice'],
       );
     },
+    paymentRequired: (context) => const PaymentRequiredPage(),
   };
 } 

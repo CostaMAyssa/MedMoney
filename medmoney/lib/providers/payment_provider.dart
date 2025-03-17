@@ -513,4 +513,24 @@ class PaymentProvider with ChangeNotifier {
       return null;
     }
   }
+  
+  // Método para verificar se o usuário tem assinatura ativa
+  Future<bool> checkActiveSubscription() async {
+    try {
+      // Verificar se o usuário está autenticado
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        return false;
+      }
+      
+      // Buscar assinaturas ativas do usuário
+      final subscriptions = await _supabaseService.getActiveSubscriptions();
+      
+      // Se encontrou pelo menos uma assinatura ativa, o usuário tem acesso
+      return subscriptions.isNotEmpty;
+    } catch (e) {
+      debugPrint('Erro ao verificar assinatura ativa: $e');
+      return false;
+    }
+  }
 } 
