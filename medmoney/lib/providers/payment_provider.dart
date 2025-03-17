@@ -470,4 +470,47 @@ class PaymentProvider with ChangeNotifier {
     
     return isConfirmed;
   }
+  
+  // Método para criar um link de pagamento do Asaas
+  Future<String?> createAsaasCheckout({
+    required String planName,
+    required String planType,
+    required double totalPrice,
+  }) async {
+    _status = PaymentStatus.processing;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      // Descrição do pagamento
+      final description = 'Assinatura $planName (${planType == 'annual' ? 'Anual' : 'Mensal'})';
+      
+      // Criar link de pagamento
+      final paymentLinkData = await _asaasService.createPaymentLink(
+        name: 'Assinatura MedMoney - $planName',
+        value: totalPrice,
+        description: description,
+        dueDateLimitDays: '7', // 7 dias para efetuar o pagamento
+        allowedPaymentTypes: ['CREDIT_CARD', 'PIX', 'BOLETO'],
+      );
+      
+      // Salvar dados do pagamento
+      _paymentData = paymentLinkData;
+      
+      // Se tudo ocorreu bem, retornar a URL do link de pagamento
+      if (paymentLinkData.containsKey('url')) {
+        _status = PaymentStatus.pixGenerated;
+        notifyListeners();
+        return paymentLinkData['url'];
+      } else {
+        throw Exception('URL do link de pagamento não encontrada na resposta');
+      }
+    } catch (e) {
+      debugPrint('Erro ao criar link de pagamento: $e');
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Falha ao gerar o checkout: ${e.toString()}';
+      notifyListeners();
+      return null;
+    }
+  }
 } 

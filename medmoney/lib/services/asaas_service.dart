@@ -579,4 +579,58 @@ class AsaasService {
   String getSubscriptionUrl(String subscriptionId) {
     return '$_baseUrl/subscriptions/$subscriptionId';
   }
+
+  // Método para criar um link de pagamento
+  Future<Map<String, dynamic>> createPaymentLink({
+    required String name,
+    required double value,
+    required String description,
+    String? dueDateLimitDays,
+    bool? chargeType,
+    List<String>? allowedPaymentTypes,
+  }) async {
+    try {
+      debugPrint('Criando link de pagamento no Asaas...');
+      debugPrint('URL: $_baseUrl/paymentLinks');
+      
+      final url = Uri.parse('$_baseUrl/paymentLinks');
+      
+      final body = jsonEncode({
+        'name': name,
+        'description': description,
+        'value': value,
+        'dueDateLimitDays': dueDateLimitDays ?? '30',
+        'chargeType': chargeType ?? false, // false = não cobrar pela emissão
+        'allowedPaymentTypes': allowedPaymentTypes ?? ['CREDIT_CARD', 'PIX', 'BOLETO'],
+      });
+      
+      debugPrint('Body: $body');
+      
+      final response = await http.post(
+        url, 
+        headers: _headers, 
+        body: body
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao criar link de pagamento no Asaas');
+        },
+      );
+      
+      debugPrint('Resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        debugPrint('Link de pagamento criado com sucesso: ${responseData['id']}');
+        debugPrint('URL do link: ${responseData['url']}');
+        return responseData;
+      } else {
+        throw Exception('Falha ao criar link de pagamento: [${response.statusCode}] ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Erro ao criar link de pagamento no Asaas: $e');
+      throw Exception('Não foi possível criar o link de pagamento no Asaas: $e');
+    }
+  }
 } 

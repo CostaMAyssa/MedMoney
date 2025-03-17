@@ -4,15 +4,11 @@ import '../utils/theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/custom_button.dart';
-import '../widgets/custom_text_field.dart';
 import '../widgets/responsive_container.dart';
-import '../services/supabase_service.dart';
 import '../utils/routes.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/asaas_service.dart';
-import 'pix_payment_page.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../providers/payment_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -35,30 +31,14 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _cardNumberController = TextEditingController();
-  final _cardHolderController = TextEditingController();
-  final _expiryDateController = TextEditingController();
-  final _cvvController = TextEditingController();
-  
   bool _isLoading = false;
   String? _errorMessage;
-  String _paymentMethod = 'credit_card'; // 'credit_card' ou 'pix'
+  bool _isPaymentUrlGenerated = false;
+  String? _paymentUrl;
+  bool _paymentSuccess = false;
 
-  @override
-  void dispose() {
-    _cardNumberController.dispose();
-    _cardHolderController.dispose();
-    _expiryDateController.dispose();
-    _cvvController.dispose();
-    super.dispose();
-  }
-
+  // Processar pagamento com o checkout do Asaas
   Future<void> _processPayment() async {
-    if (_paymentMethod == 'credit_card' && !_formKey.currentState!.validate()) {
-      return;
-    }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -67,96 +47,56 @@ class _PaymentPageState extends State<PaymentPage> {
     try {
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
-      if (_paymentMethod == 'credit_card') {
-        final success = await paymentProvider.processCreditCardPayment(
-          planName: widget.planName,
-          planType: widget.planType,
-          totalPrice: widget.totalPrice,
-          cardHolderName: _cardHolderController.text,
-          cardNumber: _cardNumberController.text,
-          expiryDate: _expiryDateController.text,
-          cvv: _cvvController.text,
-        );
-        
-        if (success && mounted) {
-          // Mostrar mensagem de sucesso para cartão
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pagamento processado com sucesso!'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-          
-          // Navegar para o dashboard após o pagamento bem-sucedido
-          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-        } else if (mounted) {
-          // Mostrar mensagem de erro
-          setState(() {
-            _errorMessage = paymentProvider.errorMessage ?? 'Erro ao processar pagamento';
-            _isLoading = false;
-          });
-          
-          // Mostrar snackbar com erro
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_errorMessage ?? 'Erro ao processar pagamento'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
+      // Gerar um link de pagamento do Asaas
+      final paymentUrl = await paymentProvider.createAsaasCheckout(
+        planName: widget.planName,
+        planType: widget.planType,
+        totalPrice: widget.totalPrice,
+      );
+      
+      setState(() {
+        _isLoading = false;
+        if (paymentUrl != null) {
+          _isPaymentUrlGenerated = true;
+          _paymentUrl = paymentUrl;
+        } else {
+          _errorMessage = paymentProvider.errorMessage ?? 'Erro ao gerar link de pagamento';
         }
-      } else if (_paymentMethod == 'pix') {
-        final success = await paymentProvider.processPixPayment(
-          planName: widget.planName,
-          planType: widget.planType,
-          totalPrice: widget.totalPrice,
-        );
-        
-        if (success && mounted && paymentProvider.pixData != null) {
-          // Navegar para a tela de QR code do PIX
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PixPaymentPage(
-                pixInfo: paymentProvider.pixData!,
-              ),
-            ),
-          );
-        } else if (mounted) {
-          // Mostrar mensagem de erro
-          setState(() {
-            _errorMessage = paymentProvider.errorMessage ?? 'Erro ao gerar PIX';
-            _isLoading = false;
-          });
-          
-          // Mostrar snackbar com erro
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_errorMessage ?? 'Erro ao gerar PIX'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
-      }
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Erro inesperado: ${e.toString()}';
-          _isLoading = false;
-        });
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Erro inesperado: ${e.toString()}';
+      });
+      
+      // Mostrar snackbar com erro
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro inesperado: ${e.toString()}'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  // Abrir o link de pagamento em uma nova aba
+  Future<void> _openPaymentLink() async {
+    if (_paymentUrl != null) {
+      final Uri url = Uri.parse(_paymentUrl!);
+      
+      try {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Erro ao abrir link de pagamento: $e');
         
-        // Mostrar snackbar com erro
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro inesperado: ${e.toString()}'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Não foi possível abrir o link de pagamento. Por favor, tente novamente.'),
+              backgroundColor: AppTheme.errorColor,
+            ),
+          );
+        }
       }
     }
   }
@@ -164,8 +104,8 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   Widget build(BuildContext context) {
     final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context);
-    final isLoading = paymentProvider.isProcessing;
-    final errorMessage = paymentProvider.errorMessage;
+    final isLoading = paymentProvider.isProcessing || _isLoading;
+    final errorMessage = paymentProvider.errorMessage ?? _errorMessage;
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -173,7 +113,7 @@ class _PaymentPageState extends State<PaymentPage> {
         child: Column(
           children: [
             // Cabeçalho
-            AppHeader(),
+            const AppHeader(),
             
             // Conteúdo principal
             ResponsiveContainer(
@@ -233,7 +173,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   // Card de pagamento
                   Card(
                     elevation: 4,
-                    color: Color(0xFF1A1A4F),
+                    color: const Color(0xFF1A1A4F),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -269,211 +209,101 @@ class _PaymentPageState extends State<PaymentPage> {
                           ),
                           const SizedBox(height: 32),
                           
-                          // Métodos de pagamento
-                          Text(
-                            'Método de pagamento',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildPaymentMethodOption(
-                                  'Cartão de Crédito',
-                                  Icons.credit_card,
-                                  'credit_card',
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildPaymentMethodOption(
-                                  'PIX',
-                                  Icons.qr_code,
-                                  'pix',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 32),
-                          
-                          // Formulário de cartão de crédito
-                          if (_paymentMethod == 'credit_card') ...[
-                            Form(
-                              key: _formKey,
+                          // Se o link de pagamento foi gerado, mostrar botões para abrir o link
+                          if (_isPaymentUrlGenerated && _paymentUrl != null) ...[
+                            Center(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    color: AppTheme.successColor,
+                                    size: 64,
+                                  ),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    'Dados do cartão',
+                                    'Link de pagamento gerado com sucesso!',
                                     style: TextStyle(
                                       fontSize: 18,
+                                      color: AppTheme.successColor,
                                       fontWeight: FontWeight.bold,
-                                      color: AppTheme.textPrimaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    'Clique no botão abaixo para abrir a página de pagamento do Asaas e concluir sua assinatura. Você poderá escolher entre cartão de crédito, PIX ou boleto.',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: AppTheme.textSecondaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _openPaymentLink,
+                                      icon: const Icon(Icons.open_in_new),
+                                      label: const Text('Abrir Página de Pagamento'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        textStyle: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  CustomTextField(
-                                    label: 'Número do cartão',
-                                    hint: '0000 0000 0000 0000',
-                                    controller: _cardNumberController,
-                                    keyboardType: TextInputType.number,
-                                    prefixIcon: Icons.credit_card,
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Por favor, informe o número do cartão';
-                                      }
-                                      return null;
-                                    },
+                                  Text(
+                                    'Após finalizar o pagamento, você será redirecionado para o dashboard automaticamente.',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontStyle: FontStyle.italic,
+                                      color: AppTheme.textSecondaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 16),
-                                  CustomTextField(
-                                    label: 'Nome no cartão',
-                                    hint: 'NOME COMO ESTÁ NO CARTÃO',
-                                    controller: _cardHolderController,
-                                    prefixIcon: Icons.person,
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Por favor, informe o nome no cartão';
-                                      }
-                                      return null;
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
                                     },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: CustomTextField(
-                                          label: 'Data de validade',
-                                          hint: 'MM/AA',
-                                          controller: _expiryDateController,
-                                          keyboardType: TextInputType.number,
-                                          prefixIcon: Icons.calendar_today,
-                                          validator: (value) {
-                                            if (value == null || value.isEmpty) {
-                                              return 'Informe a validade';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: CustomTextField(
-                                          label: 'CVV',
-                                          hint: '123',
-                                          controller: _cvvController,
-                                          keyboardType: TextInputType.number,
-                                          prefixIcon: Icons.lock,
-                                          validator: (value) {
-                                            if (value == null || value.isEmpty) {
-                                              return 'Informe o CVV';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                      ),
-                                    ],
+                                    child: const Text('Voltar para o Dashboard'),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                          
-                          // QR Code PIX
-                          if (_paymentMethod == 'pix') ...[
-                            Column(
-                              children: [
-                                Text(
-                                  'Escaneie o QR Code abaixo',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textPrimaryColor,
-                                  ),
+                          ] else ...[
+                            // Botão para gerar o link de pagamento do Asaas
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: CustomButton(
+                                text: 'Pagar com Asaas',
+                                onPressed: _processPayment,
+                                type: ButtonType.primary,
+                                size: ButtonSize.large,
+                                isLoading: isLoading,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Center(
+                              child: Text(
+                                'Ao clicar, você será redirecionado para a página de pagamento segura do Asaas, onde poderá escolher entre cartão de crédito, PIX ou boleto.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.textSecondaryColor,
                                 ),
-                                const SizedBox(height: 24),
-                                Container(
-                                  width: 200,
-                                  height: 200,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.qr_code,
-                                      size: 150,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Ou copie o código PIX',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: AppTheme.textSecondaryColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFF2A2A5F),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '00020126580014br.gov.bcb.pix0136a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0',
-                                          style: TextStyle(
-                                            color: AppTheme.textSecondaryColor,
-                                            fontSize: 12,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          Icons.copy,
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Código PIX copiado!'),
-                                              backgroundColor: AppTheme.successColor,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ],
-                          
-                          // Botão de finalizar pagamento
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            child: CustomButton(
-                              text: 'Finalizar Pagamento',
-                              onPressed: _processPayment,
-                              type: ButtonType.primary,
-                              size: ButtonSize.large,
-                              isLoading: isLoading,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -511,53 +341,6 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPaymentMethodOption(String title, IconData icon, String method) {
-    final isSelected = _paymentMethod == method;
-    
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _paymentMethod = method;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withOpacity(0.2) : Color(0xFF2A2A5F),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
-                ),
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: AppTheme.primaryColor,
-              ),
-          ],
-        ),
-      ),
     );
   }
 } 
