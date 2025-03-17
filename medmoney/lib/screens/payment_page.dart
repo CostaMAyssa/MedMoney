@@ -9,6 +9,9 @@ import '../utils/routes.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../providers/payment_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:js' as js if (dart.library.js) 'dart:js';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -59,6 +62,9 @@ class _PaymentPageState extends State<PaymentPage> {
         if (paymentUrl != null) {
           _isPaymentUrlGenerated = true;
           _paymentUrl = paymentUrl;
+          
+          // Tentar abrir o link automaticamente
+          _openPaymentUrl(paymentUrl);
         } else {
           _errorMessage = paymentProvider.errorMessage ?? 'Erro ao gerar link de pagamento';
         }
@@ -80,24 +86,40 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   // Abrir o link de pagamento em uma nova aba
-  Future<void> _openPaymentLink() async {
-    if (_paymentUrl != null) {
-      final Uri url = Uri.parse(_paymentUrl!);
-      
-      try {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        debugPrint('Erro ao abrir link de pagamento: $e');
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Não foi possível abrir o link de pagamento. Por favor, tente novamente.'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
+  void _openPaymentUrl(String url) async {
+    try {
+      // Verificar se estamos no ambiente web
+      if (kIsWeb) {
+        // Usar JS para abrir URL em nova aba (apenas em web)
+        js.context.callMethod('open', [url, '_blank']);
+      } else {
+        // Usar url_launcher em plataformas não web
+        final Uri uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          throw Exception('Não foi possível abrir a URL: $url');
         }
       }
+      
+      // Exibir mensagem de confirmação
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Link de pagamento gerado. Abrindo página do Asaas...'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Erro ao abrir link: $e');
+      
+      // Se não conseguir abrir automaticamente, mostrar instrução para o usuário
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Por favor, clique no botão "Acessar Pagamento" para continuar.'),
+          backgroundColor: AppTheme.warningColor,
+          duration: Duration(seconds: 5),
+        ),
+      );
     }
   }
 
@@ -242,9 +264,9 @@ class _PaymentPageState extends State<PaymentPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _openPaymentLink,
+                                      onPressed: () => _openPaymentUrl(_paymentUrl!),
                                       icon: const Icon(Icons.open_in_new),
-                                      label: const Text('Abrir Página de Pagamento'),
+                                      label: const Text('Acessar Pagamento'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primaryColor,
                                         foregroundColor: Colors.white,

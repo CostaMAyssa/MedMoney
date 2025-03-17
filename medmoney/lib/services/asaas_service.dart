@@ -590,10 +590,19 @@ class AsaasService {
     List<String>? allowedPaymentTypes,
   }) async {
     try {
-      debugPrint('Criando link de pagamento no Asaas...');
-      debugPrint('URL: $_baseUrl/paymentLinks');
+      // Testar conexão com a API primeiro
+      final isConnected = await checkApiConnection();
+      if (!isConnected) {
+        throw Exception('Não foi possível conectar-se ao Asaas. Verifique sua conexão e credenciais.');
+      }
       
-      final url = Uri.parse('$_baseUrl/paymentLinks');
+      debugPrint('Criando link de pagamento no Asaas...');
+      debugPrint('Ambiente: ${_isSandbox ? 'Sandbox' : 'Produção'}');
+      debugPrint('API Key (primeiros 10 chars): ${_apiKey.substring(0, 10)}...');
+      debugPrint('URL: $_baseUrl/payment-links');
+      
+      // Alterando o endpoint de paymentLinks para payment-links conforme documentação atualizada do Asaas
+      final url = Uri.parse('$_baseUrl/payment-links');
       
       final body = jsonEncode({
         'name': name,
@@ -605,6 +614,7 @@ class AsaasService {
       });
       
       debugPrint('Body: $body');
+      debugPrint('Headers: ${_headers.toString()}');
       
       final response = await http.post(
         url, 
@@ -626,7 +636,15 @@ class AsaasService {
         debugPrint('URL do link: ${responseData['url']}');
         return responseData;
       } else {
-        throw Exception('Falha ao criar link de pagamento: [${response.statusCode}] ${response.body}');
+        // Tentar extrair mensagem de erro mais detalhada
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMessage = errorData['errors']?[0]?['description'] ?? 'Erro desconhecido';
+          throw Exception('Falha ao criar link de pagamento: $errorMessage');
+        } catch (_) {
+          // Se não conseguir extrair erro, usar mensagem genérica
+          throw Exception('Falha ao criar link de pagamento: [${response.statusCode}] ${response.body}');
+        }
       }
     } catch (e) {
       debugPrint('Erro ao criar link de pagamento no Asaas: $e');

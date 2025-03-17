@@ -619,15 +619,10 @@ class SupabaseService {
           .select()
           .eq('user_id', user.id)
           .eq('status', 'active')
-          .order('created_at', ascending: false)
-          .execute();
+          .order('created_at', ascending: false);
       
-      if (response.error != null) {
-        debugPrint('Erro ao buscar assinaturas: ${response.error?.message}');
-        return [];
-      }
-      
-      return (response.data as List).cast<Map<String, dynamic>>();
+      // Converter o resultado para o formato esperado
+      return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
       debugPrint('Erro ao buscar assinaturas ativas: $e');
       return [];
