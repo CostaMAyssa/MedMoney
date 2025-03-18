@@ -196,10 +196,10 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Center(
-                              child: Icon(
-                                Icons.medical_services_outlined,
-                                size: 150,
-                                color: AppTheme.primaryColor,
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                height: 150,
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
