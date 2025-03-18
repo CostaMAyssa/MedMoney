@@ -203,7 +203,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   Text(
                     'Crie sua conta',
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: Responsive.isMobile(context) ? 24 : 32,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textPrimaryColor,
                     ),
@@ -213,7 +213,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     'Comece a organizar suas finanças em poucos passos',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: Responsive.isMobile(context) ? 14 : 16,
                       color: AppTheme.textSecondaryColor,
                     ),
                   ),
@@ -241,20 +241,46 @@ class _RegisterPageState extends State<RegisterPage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 32),
         child: Column(
           children: [
             // Indicador de progresso
-            Row(
-              children: [
-                _buildStepIndicator(0, 'Escolha seu plano'),
-                _buildStepConnector(_currentStep >= 1),
-                _buildStepIndicator(1, 'Informações pessoais'),
-                _buildStepConnector(_currentStep >= 2),
-                _buildStepIndicator(2, 'Credenciais de acesso'),
-              ],
-            ),
-            const SizedBox(height: 48),
+            Responsive.isMobile(context)
+              ? Column(
+                  children: [
+                    Row(
+                      children: [
+                        _buildStepIndicator(0, 'Plano'),
+                        _buildStepConnector(_currentStep >= 1),
+                        _buildStepIndicator(1, 'Informações'),
+                        _buildStepConnector(_currentStep >= 2),
+                        _buildStepIndicator(2, 'Credenciais'),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      _currentStep == 0 
+                        ? 'Escolha seu plano' 
+                        : _currentStep == 1 
+                          ? 'Informações pessoais' 
+                          : 'Credenciais de acesso',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    _buildStepIndicator(0, 'Escolha seu plano'),
+                    _buildStepConnector(_currentStep >= 1),
+                    _buildStepIndicator(1, 'Informações pessoais'),
+                    _buildStepConnector(_currentStep >= 2),
+                    _buildStepIndicator(2, 'Credenciais de acesso'),
+                  ],
+                ),
             
             // Mensagem de erro (se houver)
             if (_errorMessage != null) ...[
@@ -294,27 +320,54 @@ class _RegisterPageState extends State<RegisterPage> {
             
             // Botões de navegação
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (_currentStep > 0)
-                  CustomButton(
-                    text: 'Voltar',
-                    onPressed: _previousStep,
-                    type: ButtonType.outline,
-                    size: ButtonSize.medium,
+            Responsive.isMobile(context)
+                ? Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: CustomButton(
+                          text: _currentStep < 2 ? 'Continuar' : 'Criar Conta',
+                          onPressed: _nextStep,
+                          type: ButtonType.primary,
+                          size: ButtonSize.medium,
+                          isLoading: _isLoading,
+                        ),
+                      ),
+                      if (_currentStep > 0) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: CustomButton(
+                            text: 'Voltar',
+                            onPressed: _previousStep,
+                            type: ButtonType.outline,
+                            size: ButtonSize.medium,
+                          ),
+                        ),
+                      ],
+                    ],
                   )
-                else
-                  const SizedBox(),
-                CustomButton(
-                  text: _currentStep < 2 ? 'Continuar' : 'Criar Conta',
-                  onPressed: _nextStep,
-                  type: ButtonType.primary,
-                  size: ButtonSize.medium,
-                  isLoading: _isLoading,
-                ),
-              ],
-            ),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_currentStep > 0)
+                        CustomButton(
+                          text: 'Voltar',
+                          onPressed: _previousStep,
+                          type: ButtonType.outline,
+                          size: ButtonSize.medium,
+                        )
+                      else
+                        const SizedBox(),
+                      CustomButton(
+                        text: _currentStep < 2 ? 'Continuar' : 'Criar Conta',
+                        onPressed: _nextStep,
+                        type: ButtonType.primary,
+                        size: ButtonSize.medium,
+                        isLoading: _isLoading,
+                      ),
+                    ],
+                  ),
           ],
         ),
       ),
@@ -393,7 +446,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Escolha seu plano',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: Responsive.isMobile(context) ? 18 : 20,
             fontWeight: FontWeight.bold,
             color: AppTheme.textPrimaryColor,
           ),
@@ -402,7 +455,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Selecione o plano que melhor atende às suas necessidades',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: Responsive.isMobile(context) ? 14 : 16,
             color: AppTheme.textSecondaryColor,
           ),
         ),
@@ -487,7 +540,10 @@ class _RegisterPageState extends State<RegisterPage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.isMobile(context) ? 16 : 32,
+          vertical: 16
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(40),
@@ -497,7 +553,7 @@ class _RegisterPageState extends State<RegisterPage> {
           style: TextStyle(
             color: isSelected ? Colors.white : AppTheme.textSecondaryColor,
             fontWeight: FontWeight.w600,
-            fontSize: 16,
+            fontSize: Responsive.isMobile(context) ? 14 : 16,
           ),
         ),
       ),
@@ -511,40 +567,27 @@ class _RegisterPageState extends State<RegisterPage> {
     bool isSelected,
     VoidCallback onTap,
   ) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 16),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : Color(0xFF2A2A5F),
-            width: isSelected ? 2 : 1,
-          ),
+          color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Color(0xFF2A2A5F),
           borderRadius: BorderRadius.circular(16),
-          color: isSelected 
-              ? AppTheme.primaryColor.withOpacity(0.2) 
-              : Color(0xFF1A1A4F),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+            width: 2,
+          ),
         ),
         child: Row(
           children: [
             Radio(
-              value: title.contains('Básico') ? 'Básico' : 'Premium',
-              groupValue: _selectedPlan,
-              onChanged: (value) {
-                setState(() {
-                  _selectedPlan = value.toString();
-                });
-              },
+              value: true,
+              groupValue: isSelected,
+              onChanged: (_) => onTap(),
               activeColor: AppTheme.primaryColor,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,26 +595,26 @@ class _RegisterPageState extends State<RegisterPage> {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: Responsive.isMobile(context) ? 16 : 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textPrimaryColor,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: Responsive.isMobile(context) ? 12 : 14,
                       color: AppTheme.textSecondaryColor,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               price,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: Responsive.isMobile(context) ? 16 : 18,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primaryColor,
               ),
@@ -589,7 +632,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Informações pessoais',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: Responsive.isMobile(context) ? 18 : 20,
             fontWeight: FontWeight.bold,
             color: AppTheme.textPrimaryColor,
           ),
@@ -598,7 +641,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Informe seus dados pessoais para criar sua conta',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: Responsive.isMobile(context) ? 14 : 16,
             color: AppTheme.textSecondaryColor,
           ),
         ),
@@ -630,42 +673,72 @@ class _RegisterPageState extends State<RegisterPage> {
           },
         ),
         const SizedBox(height: 24),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 2,
-              child: CustomTextField(
-                label: 'Cidade',
-                hint: 'Sua cidade',
-                controller: _cityController,
-                prefixIcon: Icons.location_city,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, informe sua cidade';
-                  }
-                  return null;
-                },
+        Responsive.isMobile(context)
+            ? Column(
+                children: [
+                  CustomTextField(
+                    label: 'Cidade',
+                    hint: 'Sua cidade',
+                    controller: _cityController,
+                    prefixIcon: Icons.location_city,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor, informe sua cidade';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  CustomTextField(
+                    label: 'Estado',
+                    hint: 'UF',
+                    controller: _stateController,
+                    prefixIcon: Icons.map,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor, informe seu estado';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: CustomTextField(
+                      label: 'Cidade',
+                      hint: 'Sua cidade',
+                      controller: _cityController,
+                      prefixIcon: Icons.location_city,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor, informe sua cidade';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 1,
+                    child: CustomTextField(
+                      label: 'Estado',
+                      hint: 'UF',
+                      controller: _stateController,
+                      prefixIcon: Icons.map,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor, informe seu estado';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 1,
-              child: CustomTextField(
-                label: 'Estado',
-                hint: 'UF',
-                controller: _stateController,
-                prefixIcon: Icons.map,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, informe seu estado';
-                  }
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -677,7 +750,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Credenciais de acesso',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: Responsive.isMobile(context) ? 18 : 20,
             fontWeight: FontWeight.bold,
             color: AppTheme.textPrimaryColor,
           ),
@@ -686,7 +759,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Text(
           'Crie suas credenciais para acessar a plataforma',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: Responsive.isMobile(context) ? 14 : 16,
             color: AppTheme.textSecondaryColor,
           ),
         ),
