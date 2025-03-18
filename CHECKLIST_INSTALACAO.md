@@ -18,11 +18,21 @@ Use este checklist para garantir que todos os componentes necessários para o fu
 
 - [ ] Conta no Asaas criada
 - [ ] API Key gerada com as permissões necessárias
-- [ ] Webhook configurado com a URL correta (https://seu-dominio.com/api/webhook/asaas)
-- [ ] Eventos do webhook selecionados (Pagamento confirmado, recebido, etc.)
 - [ ] URL de redirecionamento após pagamento configurada
 - [ ] Ambiente correto selecionado (sandbox para testes ou produção)
 - [ ] Teste de pagamento realizado com sucesso
+
+## Configuração do Webhook (APÓS PUBLICAÇÃO)
+
+Esta etapa deverá ser realizada somente após a publicação do aplicativo:
+
+- [ ] Servidor Node.js configurado para receber webhooks
+- [ ] Dependências do webhook instaladas com `npm install`
+- [ ] Webhook configurado no painel do Asaas apontando para a URL correta
+- [ ] Eventos do webhook selecionados (Pagamento confirmado, recebido, etc.)
+- [ ] Teste de webhook realizado com sucesso
+
+Para instruções detalhadas sobre esta etapa, consulte o arquivo **WEBHOOK_SETUP.md**.
 
 ## Configuração do Aplicativo
 
@@ -31,10 +41,9 @@ Use este checklist para garantir que todos os componentes necessários para o fu
   - [ ] SUPABASE_KEY
   - [ ] ASAAS_API_KEY
   - [ ] ASAAS_SANDBOX
-  - [ ] WEBHOOK_PORT
+  - [ ] WEBHOOK_PORT (será utilizado após a publicação)
 - [ ] Dependências instaladas com `flutter pub get`
 - [ ] Aplicativo compilado sem erros
-- [ ] Servidor de webhook inicializado na porta correta
 
 ## Testes de Integração
 
@@ -42,14 +51,12 @@ Use este checklist para garantir que todos os componentes necessários para o fu
 - [ ] Teste de login realizado com sucesso
 - [ ] Teste de seleção de plano realizado com sucesso
 - [ ] Teste de checkout no Asaas realizado com sucesso
-- [ ] Webhook recebido e processado corretamente
-- [ ] Status da assinatura atualizado para "active"
+- [ ] Status da assinatura atualizado para "active" manualmente (webhook será configurado após publicação)
 - [ ] Usuário consegue visualizar seu plano contratado
 
 ## Verificações Finais
 
 - [ ] Aplicativo acessível via web na URL configurada
-- [ ] Servidor de webhook acessível externamente
 - [ ] Todas as funcionalidades testadas em diferentes dispositivos
 - [ ] Backup da configuração inicial realizado
 - [ ] Documento de entrega para o cliente preparado
@@ -71,10 +78,7 @@ Use este checklist para garantir que todos os componentes necessários para o fu
 - [ ] Configurar políticas de backup regulares
 - [ ] Estabelecer procedimento de monitoramento contínuo
 - [ ] Documentar processo de atualização do sistema
-
-## Limitação para Executar Comandos
-
-Infelizmente, como assistente virtual, não tenho acesso a um terminal real para executar comandos diretamente. Não posso subir sua build para o GitHub, pois isso exigiria acesso ao seu sistema e credenciais.
+- [ ] Configurar servidor de webhook conforme instruções no arquivo WEBHOOK_SETUP.md
 
 ## Guia passo a passo para você subir a build para o GitHub
 

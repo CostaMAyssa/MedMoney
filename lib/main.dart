@@ -21,7 +21,7 @@ import 'providers/transaction_provider.dart';
 import 'providers/shift_provider.dart';
 import 'providers/appointment_provider.dart';
 import 'providers/payment_provider.dart';
-import 'api/webhook_handler.dart';
+// import 'api/webhook_handler.dart'; // Webhook será configurado posteriormente
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,22 +43,10 @@ void main() async {
       debug: true,
     );
     
-    // Inicializar servidor de webhook em ambiente de produção
-    // Somente quando não estiver em modo web (para evitar erros no navegador)
-    if (!kIsWeb) {
-      try {
-        final webhookPort = int.tryParse(dotenv.env['PORT'] ?? '3000') ?? 3000;
-        final webhookHandler = WebhookHandler();
-        webhookHandler.startServer(webhookPort);
-        debugPrint('Servidor de webhook iniciado na porta $webhookPort');
-      } catch (e) {
-        debugPrint('Erro ao iniciar servidor de webhook: $e');
-        // Não interromper a execução do app se o servidor falhar
-      }
-    }
-    
-    // Desativar verificação de e-mail para testes
-    // Isso deve ser feito no painel do Supabase em Autenticação > Configurações > Email
+    // Webhook será configurado posteriormente após a publicação do projeto
+    // Consulte o arquivo WEBHOOK_SETUP.md para instruções detalhadas
+    debugPrint('NOTA: O servidor de webhook precisará ser configurado após a publicação');
+    debugPrint('Consulte o arquivo WEBHOOK_SETUP.md para instruções detalhadas');
     
     debugPrint('Supabase inicializado com sucesso!');
     
