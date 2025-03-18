@@ -113,10 +113,11 @@ class _SplashScreenState extends State<SplashScreen> {
                 shape: BoxShape.circle,
               ),
               child: Center(
-                child: Icon(
-                  Icons.medical_services_outlined,
-                  size: 100,
-                  color: AppTheme.primaryColor,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),

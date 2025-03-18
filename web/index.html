@@ -111,18 +111,28 @@
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-            // Após o carregamento, remover a tela de loading
-            document.querySelector('.loading').style.display = 'none';
-          });
-        }
-      });
+      var loading = document.querySelector('.loading');
+      
+      // Remover tela de loading imediatamente
+      if (loading) loading.style.display = 'none';
+      
+      try {
+        window._flutter = window._flutter || {};
+        window._flutter.loader = window._flutter.loader || {};
+        
+        _flutter.loader.loadEntrypoint({
+          serviceWorker: {
+            serviceWorkerVersion: serviceWorkerVersion,
+          },
+          onEntrypointLoaded: function(engineInitializer) {
+            engineInitializer.initializeEngine().then(function(appRunner) {
+              appRunner.runApp();
+            });
+          }
+        });
+      } catch (e) {
+        console.error('Erro ao inicializar Flutter:', e);
+      }
     });
   </script>
 </body>

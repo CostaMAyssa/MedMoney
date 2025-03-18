@@ -118,20 +118,20 @@ class AppHeader extends StatelessWidget {
   Widget _buildNavMenu(BuildContext context) {
     return Row(
       children: [
-        _buildNavItem(context, 'Como Funciona', '#como-funciona'),
-        _buildNavItem(context, 'Benefícios', '#beneficios'),
-        _buildNavItem(context, 'Planos', '#planos'),
-        _buildNavItem(context, 'Contato', '#contato'),
+        _buildNavItem(context, 'Como Funciona', '/'),
+        _buildNavItem(context, 'Benefícios', '/'),
+        _buildNavItem(context, 'Planos', '/'),
+        _buildNavItem(context, 'Contato', '/'),
       ],
     );
   }
 
-  Widget _buildNavItem(BuildContext context, String title, String sectionId) {
+  Widget _buildNavItem(BuildContext context, String title, String route) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TextButton(
         onPressed: () {
-          Navigator.pushReplacementNamed(context, '/', arguments: sectionId);
+          Navigator.pushReplacementNamed(context, route);
         },
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -168,19 +168,19 @@ class AppHeader extends StatelessWidget {
               }),
               _buildMobileMenuItem(context, 'Como Funciona', Icons.help_outline, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/', arguments: '#como-funciona');
+                Navigator.pushReplacementNamed(context, '/');
               }),
               _buildMobileMenuItem(context, 'Benefícios', Icons.star_outline, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/', arguments: '#beneficios');
+                Navigator.pushReplacementNamed(context, '/');
               }),
               _buildMobileMenuItem(context, 'Planos', Icons.monetization_on_outlined, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/', arguments: '#planos');
+                Navigator.pushReplacementNamed(context, '/');
               }),
               _buildMobileMenuItem(context, 'Contato', Icons.contact_support_outlined, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/', arguments: '#contato');
+                Navigator.pushReplacementNamed(context, '/');
               }),
               const Divider(color: Color(0xFF2A2A5F)),
               if (isLoggedIn) ...[
