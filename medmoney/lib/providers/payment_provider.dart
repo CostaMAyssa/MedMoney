@@ -385,6 +385,45 @@ class PaymentProvider with ChangeNotifier {
     notifyListeners();
   }
   
+  // Salvar dados do pagamento (para link de pagamento)
+  Future<bool> savePaymentData(Map<String, dynamic> paymentLinkData) async {
+    try {
+      _paymentData = paymentLinkData;
+      
+      // Salvar link de pagamento no Supabase (opcional)
+      try {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          // Dados atuais
+          final now = DateTime.now();
+          
+          // Criar registro de transação pendente
+          await _supabaseService.createTransaction({
+            'description': paymentLinkData['name'] ?? 'Assinatura via link de pagamento',
+            'amount': paymentLinkData['value'] ?? 0.0,
+            'type': 'expense',
+            'date': now.toIso8601String().split('T')[0],
+            'status': 'pending',
+            'payment_link_id': paymentLinkData['id'],
+          });
+          
+          debugPrint('Dados do link de pagamento salvos no Supabase');
+        }
+      } catch (e) {
+        debugPrint('Erro ao salvar dados no Supabase: $e');
+        // Continuar mesmo com erro no Supabase
+      }
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Erro ao salvar dados do pagamento: $e');
+      _errorMessage = 'Erro ao salvar dados do pagamento: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+  
   // Método para verificar o status do pagamento
   Future<Map<String, dynamic>?> checkPaymentStatus(String paymentId) async {
     try {

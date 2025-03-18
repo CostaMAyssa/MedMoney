@@ -40,8 +40,16 @@ class AsaasService {
       debugPrint('Verificando conexão com a API do Asaas...');
       debugPrint('URL: $_baseUrl/finance/balance');
       
-      final url = Uri.parse('$_baseUrl/finance/balance');
-      final response = await http.get(url, headers: _headers);
+      // Usar uma URL de proxy CORS para testes
+      final url = Uri.parse('https://cors-anywhere.herokuapp.com/$_baseUrl/finance/balance');
+      final response = await http.get(
+        url, 
+        headers: {
+          ..._headers,
+          'Origin': 'https://medmoney.app',
+          'X-Requested-With': 'XMLHttpRequest',
+        }
+      );
       
       debugPrint('Resposta: ${response.statusCode}');
       debugPrint('Corpo da resposta: ${response.body}');

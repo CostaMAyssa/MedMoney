@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:html' as html;
 import '../utils/responsive.dart';
 import '../utils/theme.dart';
 import '../widgets/app_header.dart';
@@ -8,10 +9,7 @@ import '../widgets/responsive_container.dart';
 import '../utils/routes.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../providers/payment_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:js' as js if (dart.library.js) 'dart:js';
+import '../services/asaas_service.dart';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -34,110 +32,82 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
-  bool _isPaymentUrlGenerated = false;
+  bool _initialized = false;
   String? _paymentUrl;
-  bool _paymentSuccess = false;
+  final AsaasService _asaasService = AsaasService();
 
-  // Processar pagamento com o checkout do Asaas
-  Future<void> _processPayment() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
-      
-      // Gerar um link de pagamento do Asaas
-      final paymentUrl = await paymentProvider.createAsaasCheckout(
-        planName: widget.planName,
-        planType: widget.planType,
-        totalPrice: widget.totalPrice,
-      );
-      
-      setState(() {
-        _isLoading = false;
-        if (paymentUrl != null) {
-          _isPaymentUrlGenerated = true;
-          _paymentUrl = paymentUrl;
-          
-          // Tentar abrir o link automaticamente
-          _openPaymentUrl(paymentUrl);
-        } else {
-          _errorMessage = paymentProvider.errorMessage ?? 'Erro ao gerar link de pagamento';
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Erro inesperado: ${e.toString()}';
-      });
-      
-      // Mostrar snackbar com erro
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro inesperado: ${e.toString()}'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      Future.microtask(() => _initializePayment());
     }
   }
 
-  // Abrir o link de pagamento em uma nova aba
-  void _openPaymentUrl(String url) async {
+  Future<void> _initializePayment() async {
+    if (!mounted) return;
+
     try {
-      // Verificar se estamos no ambiente web
-      if (kIsWeb) {
-        // Usar JS para abrir URL em nova aba (apenas em web)
-        js.context.callMethod('open', [url, '_blank']);
-      } else {
-        // Usar url_launcher em plataformas não web
-        final Uri uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          throw Exception('Não foi possível abrir a URL: $url');
-        }
-      }
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      // Solução simplificada: gerar um link direto com parâmetros na URL
+      // Isso evita os problemas de CORS ao fazer chamadas diretas à API
+      final planType = widget.planType == 'annual' ? 'Anual' : 'Mensal';
+      final description = 'Assinatura ${widget.planName} ($planType)';
       
-      // Exibir mensagem de confirmação
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Link de pagamento gerado. Abrindo página do Asaas...'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+      // Use a URL da sandbox para testes
+      final baseUrl = 'https://sandbox.asaas.com/checkout';
+      
+      // Gerar URL do checkout diretamente
+      final checkoutUrl = Uri.parse(baseUrl).replace(queryParameters: {
+        'externalReference': 'medmoney_${DateTime.now().millisecondsSinceEpoch}',
+        'totalValue': widget.totalPrice.toString(),
+        'billingType': 'UNDEFINED', // Permite que o cliente escolha
+        'name': description,
+        'description': 'Assinatura MedMoney - Plano ${widget.planName}',
+        'installments': '1', // Parcela única
+        'showDescription': 'true',
+        'showNoteField': 'false',
+        'dueDate': DateTime.now().add(Duration(days: 7)).toIso8601String().split('T')[0],
+        'maxInstallmentCount': '1',
+        'redirectUrl': 'https://medmoney.vercel.app/success', // URL de redirecionamento após o pagamento
+        'notificationEnabled': 'true',
+      }).toString();
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _paymentUrl = checkoutUrl;
+        _isLoading = false;
+      });
+
+      // Abrir o link de pagamento em uma nova aba
+      html.window.open(_paymentUrl!, '_blank');
     } catch (e) {
-      debugPrint('Erro ao abrir link: $e');
-      
-      // Se não conseguir abrir automaticamente, mostrar instrução para o usuário
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Por favor, clique no botão "Acessar Pagamento" para continuar.'),
-          backgroundColor: AppTheme.warningColor,
-          duration: Duration(seconds: 5),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erro ao gerar página de pagamento: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context);
-    final isLoading = paymentProvider.isProcessing || _isLoading;
-    final errorMessage = paymentProvider.errorMessage ?? _errorMessage;
-    
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Cabeçalho
-            const AppHeader(),
+            AppHeader(),
             
-            // Conteúdo principal
             ResponsiveContainer(
               padding: EdgeInsets.symmetric(
                 horizontal: Responsive.isMobile(context) ? 16 : 32,
@@ -163,8 +133,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     textAlign: TextAlign.center,
                   ),
                   
-                  // Exibir mensagem de erro se houver
-                  if (errorMessage != null)
+                  if (_errorMessage != null)
                     Container(
                       margin: const EdgeInsets.only(top: 16),
                       padding: const EdgeInsets.all(16),
@@ -178,13 +147,9 @@ class _PaymentPageState extends State<PaymentPage> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              errorMessage,
+                              _errorMessage!,
                               style: TextStyle(color: AppTheme.errorColor),
                             ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close, color: AppTheme.errorColor),
-                            onPressed: () => paymentProvider.clearError(),
                           ),
                         ],
                       ),
@@ -208,124 +173,87 @@ class _PaymentPageState extends State<PaymentPage> {
                           Text(
                             'Resumo da compra',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.textPrimaryColor,
                             ),
                           ),
                           const SizedBox(height: 24),
-                          _buildSummaryItem(
-                            'Plano ${widget.planName} (${widget.planType == 'annual' ? 'Anual' : 'Mensal'})',
-                            'R\$ ${widget.planPrice.toStringAsFixed(2)}',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildSummaryItem(
-                            'Taxa de setup',
-                            'R\$ ${widget.setupFee.toStringAsFixed(2)}',
-                          ),
-                          const Divider(height: 32, color: Color(0xFF2A2A5F)),
-                          _buildSummaryItem(
-                            'Total',
-                            'R\$ ${widget.totalPrice.toStringAsFixed(2)}',
-                            isTotal: true,
-                          ),
+                          
+                          // Detalhes do plano
+                          _buildPlanDetails(),
                           const SizedBox(height: 32),
                           
-                          // Se o link de pagamento foi gerado, mostrar botões para abrir o link
-                          if (_isPaymentUrlGenerated && _paymentUrl != null) ...[
+                          if (_isLoading)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else if (_paymentUrl != null)
                             Center(
                               child: Column(
                                 children: [
-                                  Icon(
-                                    Icons.check_circle_outline,
-                                    color: AppTheme.successColor,
-                                    size: 64,
-                                  ),
-                                  const SizedBox(height: 16),
                                   Text(
-                                    'Link de pagamento gerado com sucesso!',
+                                    'Uma nova aba foi aberta com a página de pagamento do Asaas.',
                                     style: TextStyle(
-                                      fontSize: 18,
-                                      color: AppTheme.successColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    'Clique no botão abaixo para abrir a página de pagamento do Asaas e concluir sua assinatura. Você poderá escolher entre cartão de crédito, PIX ou boleto.',
-                                    style: TextStyle(
+                                      color: AppTheme.textPrimaryColor,
                                       fontSize: 16,
-                                      color: AppTheme.textSecondaryColor,
                                     ),
                                     textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 24),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => _openPaymentUrl(_paymentUrl!),
-                                      icon: const Icon(Icons.open_in_new),
-                                      label: const Text('Acessar Pagamento'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primaryColor,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                        textStyle: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Após finalizar o pagamento, você será redirecionado para o dashboard automaticamente.',
+                                    'Você pode escolher entre PIX, cartão de crédito ou boleto bancário.',
                                     style: TextStyle(
-                                      fontSize: 14,
-                                      fontStyle: FontStyle.italic,
                                       color: AppTheme.textSecondaryColor,
+                                      fontSize: 14,
                                     ),
                                     textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-                                    },
-                                    child: const Text('Voltar para o Dashboard'),
                                   ),
                                 ],
                               ),
-                            ),
-                          ] else ...[
-                            // Botão para gerar o link de pagamento do Asaas
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: CustomButton(
-                                text: 'Pagar com Asaas',
-                                onPressed: _processPayment,
-                                type: ButtonType.primary,
-                                size: ButtonSize.large,
-                                isLoading: isLoading,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                            )
+                          else
                             Center(
                               child: Text(
-                                'Ao clicar, você será redirecionado para a página de pagamento segura do Asaas, onde poderá escolher entre cartão de crédito, PIX ou boleto.',
+                                'Erro ao carregar o sistema de pagamento',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppTheme.textSecondaryColor,
+                                  color: AppTheme.errorColor,
+                                  fontSize: 16,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                          ],
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Botões
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_paymentUrl != null) ...[
+                                CustomButton(
+                                  text: 'Reabrir página de pagamento',
+                                  onPressed: () {
+                                    if (_paymentUrl != null) {
+                                      html.window.open(_paymentUrl!, '_blank');
+                                    }
+                                  },
+                                  type: ButtonType.primary,
+                                ),
+                                const SizedBox(width: 16),
+                              ],
+                              CustomButton(
+                                text: 'Voltar para o Dashboard',
+                                onPressed: () {
+                                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+                                },
+                                type: ButtonType.secondary,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -334,11 +262,33 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
             
-            // Rodapé
-            const AppFooter(),
+            AppFooter(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPlanDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSummaryItem(
+          'Plano ${widget.planName} (${widget.planType == 'annual' ? 'Anual' : 'Mensal'})',
+          'R\$ ${widget.planPrice.toStringAsFixed(2)}',
+        ),
+        const SizedBox(height: 8),
+        _buildSummaryItem(
+          'Taxa de setup',
+          'R\$ ${widget.setupFee.toStringAsFixed(2)}',
+        ),
+        const Divider(height: 32, color: Color(0xFF2A2A5F)),
+        _buildSummaryItem(
+          'Total',
+          'R\$ ${widget.totalPrice.toStringAsFixed(2)}',
+          isTotal: true,
+        ),
+      ],
     );
   }
 
