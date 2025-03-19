@@ -1,29 +1,33 @@
 class Subscription {
   final String id;
   final String userId;
-  final String planType;
-  final String billingFrequency;
-  final double amount;
+  final String? planId;
+  final String planName;
+  final String planType; // 'monthly' ou 'annual'
+  final double price;
   final String status;
   final DateTime? startDate;
   final DateTime? nextBillingDate;
   final DateTime? expirationDate;
   final String? paymentId;
   final String? externalReference;
+  final DateTime? canceledAt;
   final Map<String, dynamic>? metadata;
 
   Subscription({
     required this.id,
     required this.userId,
+    this.planId,
+    required this.planName,
     required this.planType,
-    required this.billingFrequency,
-    required this.amount,
+    required this.price,
     required this.status,
     this.startDate,
     this.nextBillingDate,
     this.expirationDate,
     this.paymentId,
     this.externalReference,
+    this.canceledAt,
     this.metadata,
   });
 
@@ -31,11 +35,12 @@ class Subscription {
     return Subscription(
       id: json['id'],
       userId: json['user_id'],
+      planId: json['plan_id'],
+      planName: json['plan_name'],
       planType: json['plan_type'],
-      billingFrequency: json['billing_frequency'],
-      amount: json['amount'] is int 
-          ? (json['amount'] as int).toDouble() 
-          : json['amount'],
+      price: json['price'] is int 
+          ? (json['price'] as int).toDouble() 
+          : json['price'],
       status: json['status'],
       startDate: json['start_date'] != null 
           ? DateTime.parse(json['start_date']) 
@@ -48,6 +53,9 @@ class Subscription {
           : null,
       paymentId: json['payment_id'],
       externalReference: json['external_reference'],
+      canceledAt: json['canceled_at'] != null
+          ? DateTime.parse(json['canceled_at'])
+          : null,
       metadata: json['metadata'],
     );
   }
@@ -56,15 +64,17 @@ class Subscription {
     return {
       'id': id,
       'user_id': userId,
+      'plan_id': planId,
+      'plan_name': planName,
       'plan_type': planType,
-      'billing_frequency': billingFrequency,
-      'amount': amount,
+      'price': price,
       'status': status,
       'start_date': startDate?.toIso8601String(),
       'next_billing_date': nextBillingDate?.toIso8601String(),
       'expiration_date': expirationDate?.toIso8601String(),
       'payment_id': paymentId,
       'external_reference': externalReference,
+      'canceled_at': canceledAt?.toIso8601String(),
       'metadata': metadata,
     };
   }
@@ -72,29 +82,33 @@ class Subscription {
   Subscription copyWith({
     String? id,
     String? userId,
+    String? planId,
+    String? planName,
     String? planType,
-    String? billingFrequency,
-    double? amount,
+    double? price,
     String? status,
     DateTime? startDate,
     DateTime? nextBillingDate,
     DateTime? expirationDate,
     String? paymentId,
     String? externalReference,
+    DateTime? canceledAt,
     Map<String, dynamic>? metadata,
   }) {
     return Subscription(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      planId: planId ?? this.planId,
+      planName: planName ?? this.planName,
       planType: planType ?? this.planType,
-      billingFrequency: billingFrequency ?? this.billingFrequency,
-      amount: amount ?? this.amount,
+      price: price ?? this.price,
       status: status ?? this.status,
       startDate: startDate ?? this.startDate,
       nextBillingDate: nextBillingDate ?? this.nextBillingDate,
       expirationDate: expirationDate ?? this.expirationDate,
       paymentId: paymentId ?? this.paymentId,
       externalReference: externalReference ?? this.externalReference,
+      canceledAt: canceledAt ?? this.canceledAt,
       metadata: metadata ?? this.metadata,
     );
   }

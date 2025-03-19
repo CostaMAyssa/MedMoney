@@ -25,6 +25,57 @@ class _SubscriptionStatusPageState extends State<SubscriptionStatusPage> {
     _loadSubscription();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Verificar se há parâmetros na URL (vindo do redirecionamento de pagamento)
+    final uri = Uri.parse(ModalRoute.of(context)?.settings.name ?? '');
+    if (uri.queryParameters.isNotEmpty) {
+      final paymentId = uri.queryParameters['payment_id'];
+      final externalReference = uri.queryParameters['external_reference'];
+      
+      if (paymentId != null || externalReference != null) {
+        // Se temos parâmetros de pagamento, atualizar a assinatura
+        debugPrint('Recebido redirecionamento com paymentId=$paymentId, externalReference=$externalReference');
+        _refreshSubscriptionStatus(paymentId, externalReference);
+      }
+    }
+  }
+  
+  Future<void> _refreshSubscriptionStatus(String? paymentId, String? externalReference) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Aguardar um pouco para dar tempo do webhook ser processado
+      await Future.delayed(Duration(seconds: 2));
+      
+      // Recarregar a assinatura
+      await _loadSubscription();
+      
+      // Mostrar mensagem de sucesso (opcional)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pagamento processado! Sua assinatura foi atualizada.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erro ao atualizar status da assinatura: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadSubscription() async {
     setState(() {
       _isLoading = true;
@@ -61,11 +112,11 @@ class _SubscriptionStatusPageState extends State<SubscriptionStatusPage> {
       context,
       '/payment',
       arguments: {
-        'planName': _subscription!.planType.toUpperCase(),
-        'planType': _subscription!.billingFrequency,
-        'planPrice': _subscription!.amount,
+        'planName': _subscription!.planName,
+        'planType': _subscription!.planType,
+        'planPrice': _subscription!.price,
         'setupFee': 0.0,
-        'totalPrice': _subscription!.amount,
+        'totalPrice': _subscription!.price,
       },
     );
   }
@@ -138,7 +189,7 @@ class _SubscriptionStatusPageState extends State<SubscriptionStatusPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Plano ${_subscription!.planType.toUpperCase()}',
+                  'Plano ${_subscription!.planName.toUpperCase()}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -161,8 +212,8 @@ class _SubscriptionStatusPageState extends State<SubscriptionStatusPage> {
               ],
             ),
             const SizedBox(height: 20),
-            _buildInfoRow('Periodicidade', _subscription!.billingFrequency == 'monthly' ? 'Mensal' : 'Anual'),
-            _buildInfoRow('Valor', _formatCurrency(_subscription!.amount)),
+            _buildInfoRow('Periodicidade', _subscription!.planType == 'monthly' ? 'Mensal' : 'Anual'),
+            _buildInfoRow('Valor', _formatCurrency(_subscription!.price)),
             _buildInfoRow('Data de início', _formatDate(_subscription!.startDate)),
             _buildInfoRow('Próxima cobrança', _formatDate(_subscription!.nextBillingDate)),
             _buildInfoRow('Data de expiração', _formatDate(_subscription!.expirationDate)),

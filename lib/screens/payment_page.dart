@@ -10,6 +10,8 @@ import '../utils/routes.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../providers/payment_provider.dart';
 import '../services/asaas_service.dart';
+import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -37,6 +39,13 @@ class _PaymentPageState extends State<PaymentPage> {
   bool _initialized = false;
   String? _paymentUrl;
   final AsaasService _asaasService = AsaasService();
+  late final SupabaseService _supabaseService;
+
+  @override
+  void initState() {
+    super.initState();
+    _supabaseService = SupabaseService();
+  }
 
   @override
   void didChangeDependencies() {
@@ -64,9 +73,27 @@ class _PaymentPageState extends State<PaymentPage> {
       // Use a URL da sandbox para testes
       final baseUrl = 'https://sandbox.asaas.com/checkout';
       
+      // Gerar um código único para referência externa
+      final externalReference = 'medmoney_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Salvar o plano escolhido pelo usuário no Supabase
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        await _supabaseService.saveSelectedPlan(
+          userId: userId,
+          planType: widget.planName,
+          billingFrequency: widget.planType,
+          price: widget.totalPrice,
+          externalReference: externalReference,
+          paymentId: null, // Será atualizado quando recebermos o webhook
+        );
+      } else {
+        throw Exception('Usuário não está autenticado');
+      }
+      
       // Gerar URL do checkout diretamente
       final checkoutUrl = Uri.parse(baseUrl).replace(queryParameters: {
-        'externalReference': 'medmoney_${DateTime.now().millisecondsSinceEpoch}',
+        'externalReference': externalReference,
         'totalValue': widget.totalPrice.toString(),
         'billingType': 'UNDEFINED', // Permite que o cliente escolha
         'name': description,
@@ -76,7 +103,8 @@ class _PaymentPageState extends State<PaymentPage> {
         'showNoteField': 'false',
         'dueDate': DateTime.now().add(Duration(days: 7)).toIso8601String().split('T')[0],
         'maxInstallmentCount': '1',
-        'redirectUrl': 'https://medmoney.vercel.app/success', // URL de redirecionamento após o pagamento
+        'redirectUrl': 'https://medmoney.app/api/payment/success', // URL de redirecionamento após o pagamento
+        'failureRedirectUrl': 'https://medmoney.app/api/payment/failure', // URL de redirecionamento em caso de falha
         'notificationEnabled': 'true',
       }).toString();
       

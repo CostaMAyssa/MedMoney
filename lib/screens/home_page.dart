@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
-import '../utils/responsive.dart';
-import '../utils/theme.dart';
+import 'package:provider/provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/responsive_container.dart';
+import '../providers/auth_provider.dart';
+import '../utils/theme.dart';
+import '../utils/routes.dart';
+import '../utils/responsive.dart';
 
 class HomePage extends StatefulWidget {
   final String? initialSection;
   
-  const HomePage({super.key, this.initialSection});
+  const HomePage({Key? key, this.initialSection}) : super(key: key);
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -31,7 +34,19 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     // Agendar a navegação para depois que o widget for construído
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _navigateToSection(widget.initialSection);
+      // Verificar se temos um initialSection ou argumentos de navegação
+      if (widget.initialSection != null) {
+        _navigateToSection(widget.initialSection!);
+      } else {
+        // Verificar se há argumentos de navegação
+        final modalRoute = ModalRoute.of(context);
+        if (modalRoute != null && modalRoute.settings.arguments != null) {
+          final args = modalRoute.settings.arguments as Map<String, dynamic>?;
+          if (args != null && args.containsKey('section')) {
+            _navigateToSection(args['section'] as String);
+          }
+        }
+      }
     });
   }
   
@@ -41,46 +56,78 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
   
-  void _navigateToSection(String? section) {
-    if (section == null) return;
+  void _navigateToSection(String section) {
+    if (section.isEmpty) return;
+    
+    // Remover o # se estiver presente
+    final sectionName = section.startsWith('#') ? section.substring(1) : section;
     
     GlobalKey? targetKey;
     
-    switch (section) {
-      case '#como-funciona':
+    switch (sectionName) {
+      case 'como-funciona':
         targetKey = _workflowKey;
         break;
-      case '#beneficios':
+      case 'beneficios':
         targetKey = _benefitsKey;
         break;
-      case '#planos':
+      case 'planos':
         targetKey = _plansKey;
         break;
-      case '#contato':
-        targetKey = _securityKey; // Usando a seção de segurança como contato por enquanto
+      case 'contato':
+        targetKey = _securityKey;
+        break;
+      case 'demo':
+        targetKey = _demoKey;
         break;
       default:
-        return;
+        // Se não encontrar uma correspondência exata, tenta uma aproximação
+        if (sectionName.contains('workflow') || sectionName.contains('funciona')) {
+          targetKey = _workflowKey;
+        } else if (sectionName.contains('benefit') || sectionName.contains('beneficio')) {
+          targetKey = _benefitsKey;
+        } else if (sectionName.contains('plan') || sectionName.contains('plano')) {
+          targetKey = _plansKey;
+        } else if (sectionName.contains('contact') || sectionName.contains('contato')) {
+          targetKey = _securityKey;
+        } else if (sectionName.contains('demo')) {
+          targetKey = _demoKey;
+        }
+        break;
     }
     
-    if (targetKey.currentContext != null) {
+    if (targetKey != null && targetKey.currentContext != null) {
       Scrollable.ensureVisible(
         targetKey.currentContext!,
-        duration: const Duration(milliseconds: 800),
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
-        alignment: 0.0,
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = Provider.of<AuthProvider>(context).isAuthenticated;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isSmallScreen = screenWidth < 1000;
+
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       body: SingleChildScrollView(
         controller: _scrollController,
         child: Column(
           children: [
-            const AppHeader(),
+            AppHeader(
+              isLoggedIn: isLoggedIn,
+              onLoginPressed: () => Navigator.of(context).pushNamed(AppRoutes.login),
+              onRegisterPressed: () => Navigator.of(context).pushNamed(AppRoutes.register),
+              onLogoutPressed: () => _handleLogout(context),
+              onDashboardPressed: () => Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard),
+              showLogo: true,
+              isTransparent: false,
+              isHomePage: true,
+            ),
             _buildHeroSection(context, _heroKey),
             _buildBenefitsSection(_benefitsKey),
             _buildWorkflowSection(_workflowKey),
@@ -833,5 +880,9 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  void _handleLogout(BuildContext context) {
+    // Implemente a lógica para lidar com o logout
   }
 } 

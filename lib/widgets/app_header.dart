@@ -11,6 +11,7 @@ class AppHeader extends StatelessWidget {
   final bool showLogo;
   final bool isTransparent;
   final bool showBackButton;
+  final bool isHomePage;
 
   const AppHeader({
     Key? key,
@@ -22,6 +23,7 @@ class AppHeader extends StatelessWidget {
     this.showLogo = true,
     this.isTransparent = false,
     this.showBackButton = false,
+    this.isHomePage = false,
   }) : super(key: key);
 
   @override
@@ -117,11 +119,12 @@ class AppHeader extends StatelessWidget {
 
   Widget _buildNavMenu(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _buildNavItem(context, 'Como Funciona', '/'),
-        _buildNavItem(context, 'Benefícios', '/'),
-        _buildNavItem(context, 'Planos', '/'),
-        _buildNavItem(context, 'Contato', '/'),
+        _buildNavItem(context, 'Como Funciona', '#como-funciona'),
+        _buildNavItem(context, 'Benefícios', '#beneficios'),
+        _buildNavItem(context, 'Planos', '#planos'),
+        _buildNavItem(context, 'Contato', '#contato'),
       ],
     );
   }
@@ -131,17 +134,25 @@ class AppHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TextButton(
         onPressed: () {
-          Navigator.pushReplacementNamed(context, route);
+          if (route.startsWith('#')) {
+            // Se é uma âncora, navegar para a home com a seção
+            Navigator.of(context).pushReplacementNamed('/', arguments: {
+              'section': route,
+            });
+          } else {
+            // Navegar para uma rota normal
+            Navigator.of(context).pushNamed(route);
+          }
         },
         style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.zero,
         ),
         child: Text(
           title,
           style: TextStyle(
             color: AppTheme.textPrimaryColor,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
-            fontSize: 18,
           ),
         ),
       ),
@@ -168,19 +179,19 @@ class AppHeader extends StatelessWidget {
               }),
               _buildMobileMenuItem(context, 'Como Funciona', Icons.help_outline, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/');
+                _navigateToSection(context, '#como-funciona');
               }),
               _buildMobileMenuItem(context, 'Benefícios', Icons.star_outline, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/');
+                _navigateToSection(context, '#beneficios');
               }),
               _buildMobileMenuItem(context, 'Planos', Icons.monetization_on_outlined, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/');
+                _navigateToSection(context, '#planos');
               }),
               _buildMobileMenuItem(context, 'Contato', Icons.contact_support_outlined, () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/');
+                _navigateToSection(context, '#contato');
               }),
               const Divider(color: Color(0xFF2A2A5F)),
               if (isLoggedIn) ...[
@@ -230,5 +241,11 @@ class AppHeader extends StatelessWidget {
       ),
       onTap: onTap,
     );
+  }
+
+  void _navigateToSection(BuildContext context, String route) {
+    Navigator.of(context).pushReplacementNamed('/', arguments: {
+      'section': route,
+    });
   }
 } 

@@ -9,21 +9,6 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
-  late final SupabaseClient _client;
-  
-  // Método de inicialização como método de instância
-  Future<void> initialize() async {
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    final supabaseKey = dotenv.env['SUPABASE_KEY'] ?? '';
-    
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseKey,
-    );
-    
-    _client = Supabase.instance.client;
-  }
-  
   // Método para obter o cliente Supabase
   SupabaseClient get client => Supabase.instance.client;
 
@@ -44,6 +29,17 @@ class SupabaseService {
       debugPrint('Erro ao inicializar Supabase: $e');
       rethrow;
     }
+  }
+  
+  // Método de inicialização como método de instância
+  Future<void> initialize() async {
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseKey = dotenv.env['SUPABASE_KEY'] ?? '';
+    
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+    );
   }
   
   // Autenticação
@@ -648,7 +644,7 @@ class SupabaseService {
       }
       
       // Buscar assinaturas ativas do usuário
-      final response = await _client
+      final response = await client
           .from('subscriptions')
           .select()
           .eq('user_id', user.id)
@@ -886,6 +882,65 @@ class SupabaseService {
           .eq('payment_id', paymentId);
     } catch (e) {
       debugPrint('Erro ao atualizar status de processamento do log: $e');
+    }
+  }
+
+  // Método para salvar o plano escolhido pelo usuário
+  Future<void> saveSelectedPlan({
+    required String userId,
+    required String planType, // Aqui é o nome do plano (Basic, Premium, etc.)
+    required String billingFrequency, // Aqui é 'annual' ou 'monthly'
+    required double price,
+    required String externalReference,
+    required String? paymentId,
+  }) async {
+    try {
+      debugPrint('Salvando plano escolhido: userId=$userId, planName=$planType, billingFrequency=$billingFrequency, price=$price');
+      
+      // Buscar plano existente
+      final existingSubscription = await getUserSubscription(userId);
+      
+      // Se já existe uma assinatura, atualizamos ela
+      if (existingSubscription != null) {
+        debugPrint('Assinatura existente encontrada com ID ${existingSubscription.id}, atualizando...');
+        
+        await client
+          .from('subscriptions')
+          .update({
+            'plan_name': planType, // planType contém o nome do plano (Basic, Premium, etc.)
+            'plan_type': billingFrequency, // billingFrequency contém 'annual' ou 'monthly'
+            'price': price,
+            'payment_id': paymentId,
+            'external_reference': externalReference,
+            'status': 'pending', // Status inicial é pendente até confirmação do webhook
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', existingSubscription.id);
+      } else {
+        // Caso contrário, criamos uma nova
+        debugPrint('Nenhuma assinatura existente, criando nova...');
+        
+        await client
+          .from('subscriptions')
+          .insert({
+            'user_id': userId,
+            'plan_name': planType, // planType contém o nome do plano (Basic, Premium, etc.)
+            'plan_type': billingFrequency, // billingFrequency contém 'annual' ou 'monthly'
+            'price': price,
+            'payment_id': paymentId,
+            'external_reference': externalReference,
+            'status': 'pending', // Status inicial é pendente até confirmação do webhook
+            'start_date': DateTime.now().toIso8601String(),
+            'next_billing_date': DateTime.now().add(Duration(days: 30)).toIso8601String(),
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+      }
+      
+      debugPrint('Plano salvo com sucesso');
+    } catch (e) {
+      debugPrint('Erro ao salvar plano escolhido: $e');
+      rethrow;
     }
   }
 } 
