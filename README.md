@@ -1,0 +1,1 @@
+# MedMoney - WebApp\n\nEste é o site de produção do aplicativo MedMoney. O site serve como ponto de integração para webhooks do Asaas e também hospeda o aplicativo web.\n\nURL: https://costamayssa.github.io/MedMoney\n
