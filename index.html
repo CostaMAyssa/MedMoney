@@ -43,12 +43,34 @@
 
   <!-- Dados do env incorporados no HTML -->
   <script>
-    window.flutterEnv = {
-      SUPABASE_URL: "https://rwotvxqknrjurqrhxhjv.supabase.co",
-      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M",
-      SUPABASE_SERVICE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ",
-      ASAAS_API_KEY: "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2",
-      ASAAS_SANDBOX: "false"
+    // Definindo as variáveis de ambiente globalmente
+    window.SUPABASE_URL = "https://rwotvxqknrjurqrhxhjv.supabase.co";
+    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M";
+    window.SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ";
+    window.ASAAS_API_KEY = "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2";
+    window.ASAAS_SANDBOX = "false";
+    
+    // Simulando o conteúdo do arquivo .env para o Flutter poder ler
+    window.getEnvFileContent = function() {
+      return `SUPABASE_URL=${window.SUPABASE_URL}
+SUPABASE_ANON_KEY=${window.SUPABASE_ANON_KEY}
+SUPABASE_SERVICE_KEY=${window.SUPABASE_SERVICE_KEY}
+ASAAS_API_KEY=${window.ASAAS_API_KEY}
+ASAAS_SANDBOX=${window.ASAAS_SANDBOX}`;
+    };
+
+    // Sobreescrevendo a API fetch para capturar a requisição do .env
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      if (url.includes('assets/.env')) {
+        return Promise.resolve({
+          ok: true,
+          text: function() {
+            return Promise.resolve(window.getEnvFileContent());
+          }
+        });
+      }
+      return originalFetch(url, options);
     };
   </script>
 
