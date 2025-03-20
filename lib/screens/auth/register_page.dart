@@ -257,7 +257,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         _buildStepIndicator(2, 'Credenciais'),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 36),
                     Text(
                       _currentStep == 0 
                         ? 'Escolha seu plano' 
@@ -451,7 +451,7 @@ class _RegisterPageState extends State<RegisterPage> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Text(
           'Selecione o plano que melhor atende às suas necessidades',
           style: TextStyle(
@@ -637,7 +637,7 @@ class _RegisterPageState extends State<RegisterPage> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Text(
           'Informe seus dados pessoais para criar sua conta',
           style: TextStyle(
@@ -756,7 +756,7 @@ class _RegisterPageState extends State<RegisterPage> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Text(
           'Crie suas credenciais para acessar a plataforma',
           style: TextStyle(
