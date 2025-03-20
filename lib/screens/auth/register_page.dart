@@ -262,7 +262,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       _currentStep == 0 
                         ? 'Escolha seu plano' 
                         : _currentStep == 1 
-                          ? 'Informações pessoais' 
+                          ? 'Informações Pessoais' 
                           : 'Credenciais de acesso',
                       style: TextStyle(
                         fontSize: 18,
@@ -276,7 +276,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     _buildStepIndicator(0, 'Escolha seu plano'),
                     _buildStepConnector(_currentStep >= 1),
-                    _buildStepIndicator(1, 'Informações pessoais'),
+                    _buildStepIndicator(1, 'Informações Pessoais'),
                     _buildStepConnector(_currentStep >= 2),
                     _buildStepIndicator(2, 'Credenciais de acesso'),
                   ],
@@ -630,7 +630,7 @@ class _RegisterPageState extends State<RegisterPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Informações pessoais',
+          'Informações Pessoais',
           style: TextStyle(
             fontSize: Responsive.isMobile(context) ? 18 : 20,
             fontWeight: FontWeight.bold,
@@ -675,6 +675,7 @@ class _RegisterPageState extends State<RegisterPage> {
         const SizedBox(height: 24),
         Responsive.isMobile(context)
             ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CustomTextField(
                     label: 'Cidade',
