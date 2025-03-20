@@ -96,7 +96,7 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    const serviceWorkerVersion = "2980379603";
+    const serviceWorkerVersion = null;
   </script>
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
@@ -113,26 +113,27 @@
       // Download main.dart.js
       var loading = document.querySelector('.loading');
       
-      // Remover tela de loading imediatamente
-      if (loading) loading.style.display = 'none';
+      _flutter = {};
+      _flutter.loader = {};
       
-      try {
-        window._flutter = window._flutter || {};
-        window._flutter.loader = window._flutter.loader || {};
-        
-        _flutter.loader.loadEntrypoint({
-          serviceWorker: {
-            serviceWorkerVersion: serviceWorkerVersion,
-          },
-          onEntrypointLoaded: function(engineInitializer) {
-            engineInitializer.initializeEngine().then(function(appRunner) {
-              appRunner.runApp();
-            });
-          }
-        });
-      } catch (e) {
-        console.error('Erro ao inicializar Flutter:', e);
-      }
+      // Inicializar Flutter adequadamente
+      _flutter.loader.load = function(options) {
+        try {
+          const main = document.createElement('script');
+          main.src = 'main.dart.js';
+          main.type = 'application/javascript';
+          document.body.appendChild(main);
+          
+          // Esconder a tela de carregamento quando o app estiver pronto
+          window.addEventListener('flutter-first-frame', function() {
+            if (loading) loading.remove();
+          });
+        } catch (e) {
+          console.error('Erro ao carregar Flutter:', e);
+        }
+      };
+      
+      _flutter.loader.load();
     });
   </script>
 </body>
