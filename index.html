@@ -41,72 +41,6 @@
   <title>MedMoney - Gestão Financeira para Profissionais da Saúde</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Dados do env incorporados no HTML -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script>
-    // Definindo as variáveis de ambiente globalmente
-    window.SUPABASE_URL = "https://rwotvxqknrjurqrhxhjv.supabase.co";
-    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M";
-    window.SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ";
-    window.ASAAS_API_KEY = "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2";
-    window.ASAAS_SANDBOX = "false";
-    
-    // Pré-inicializando o cliente Supabase
-    try {
-      window.supabaseClient = supabase.createClient(
-        window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY
-      );
-      console.log('Supabase client pré-inicializado com sucesso');
-    } catch (e) {
-      console.error('Erro ao pré-inicializar o cliente Supabase:', e);
-    }
-    
-    // Simulando o conteúdo do arquivo .env para o Flutter poder ler
-    window.getEnvFileContent = function() {
-      return `SUPABASE_URL=${window.SUPABASE_URL}
-SUPABASE_ANON_KEY=${window.SUPABASE_ANON_KEY}
-SUPABASE_SERVICE_KEY=${window.SUPABASE_SERVICE_KEY}
-ASAAS_API_KEY=${window.ASAAS_API_KEY}
-ASAAS_SANDBOX=${window.ASAAS_SANDBOX}`;
-    };
-
-    // Configurando tipos inteiros padrão para resolver problemas de subtipo
-    window.dartInts = {};
-    for (let i = 0; i < 100; i++) {
-      window.dartInts[i] = i;
-    }
-
-    // Função auxiliar para resolver problemas de tipo
-    window.dartFloatToInt = function(value) {
-      if (typeof value === 'number') {
-        return Math.floor(value);
-      }
-      return 0;
-    };
-
-    // Interceptando erros para debug
-    window.addEventListener('error', function(event) {
-      console.log('Erro global capturado:', event.error);
-    });
-
-    // Sobreescrevendo a API fetch para capturar a requisição do .env
-    const originalFetch = window.fetch;
-    window.fetch = function(url, options) {
-      if (url && typeof url === 'string' && url.includes('assets/.env')) {
-        console.log('Interceptando requisição para .env');
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          text: function() {
-            return Promise.resolve(window.getEnvFileContent());
-          }
-        });
-      }
-      return originalFetch(url, options);
-    };
-  </script>
-
   <style>
     body {
       background-color: #0A0A3E;
@@ -162,9 +96,17 @@ ASAAS_SANDBOX=${window.ASAAS_SANDBOX}`;
   </style>
 
   <script>
-    // The value below is injected by flutter build, do not touch.
+    // Definindo as variáveis de ambiente globalmente
+    window.SUPABASE_URL = "https://rwotvxqknrjurqrhxhjv.supabase.co";
+    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M";
+    window.SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ";
+    window.ASAAS_API_KEY = "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2";
+    window.ASAAS_SANDBOX = "false";
+
+    // O valor abaixo é injetado pelo flutter build, não modificar manualmente.
     const serviceWorkerVersion = null;
   </script>
+  
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 </head>
@@ -175,17 +117,97 @@ ASAAS_SANDBOX=${window.ASAAS_SANDBOX}`;
     <div class="spinner"></div>
   </div>
 
+  <!-- Solução Alternativa: Usando um iframe escondido que contém o conteúdo .env -->
+  <iframe id="envFrame" src="data:text/plain;charset=utf-8,SUPABASE_URL=https://rwotvxqknrjurqrhxhjv.supabase.co%0ASUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M%0ASUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ%0AASAAS_API_KEY=$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2%0AASAAS_SANDBOX=false" style="display:none;"></iframe>
+
+  <!-- Criando arquivo .env real no sistema de arquivos virtual -->
+  <script>
+    // Armazenando o conteúdo do .env no localStorage para simular um arquivo físico
+    localStorage.setItem('env_content', `SUPABASE_URL=https://rwotvxqknrjurqrhxhjv.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4OTI0MzIsImV4cCI6MjA1NzQ2ODQzMn0.RgrvQZ2ltMtxVFWkcO2fRD2ySSeYdvaHVmM7MNGZt_M
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3b3R2eHFrbnJqdXJxcmh4aGp2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTg5MjQzMiwiZXhwIjoyMDU3NDY4NDMyfQ.Rl_0RZEtl4JBs0-8h-RY7CHwdEq5GG_QhEgUWN_8YyQ
+ASAAS_API_KEY=$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmQ0YzAxNDc5LWU4ZTktNGQzNC04NjdiLTdjNGJhYmRlYjVlYzo6JGFhY2hfYzk2NWRmNmMtNzQ1MC00MDY3LTliM2QtMzkyYzllZjY1MWQ2
+ASAAS_SANDBOX=false`);
+
+    // Criando um Blob para representar o arquivo .env
+    const envBlob = new Blob(
+      [localStorage.getItem('env_content')], 
+      { type: 'text/plain' }
+    );
+    
+    // Criando uma URL para o Blob
+    window.envURL = URL.createObjectURL(envBlob);
+    
+    // Redirecionando todas as solicitações para assets/.env
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      if (url && typeof url === 'string') {
+        // Se for uma solicitação para o arquivo .env
+        if (url.includes('assets/.env')) {
+          console.log('Interceptando requisição para .env');
+          return fetch(window.envURL);
+        }
+        
+        // Se for uma solicitação para outros arquivos de ambiente
+        if (url.includes('.env') || url.endsWith('/')) {
+          console.log('Possível requisição de ambiente:', url);
+        }
+      }
+      
+      return originalFetch(url, options);
+    };
+
+    // Polyfill para resolver problemas de tipo
+    if (typeof Number.isInteger !== 'function') {
+      Number.isInteger = function(value) {
+        return typeof value === 'number' && 
+          isFinite(value) && 
+          Math.floor(value) === value;
+      };
+    }
+
+    // Helpers para resolver problemas de tipo
+    window.ensureInt = function(value) {
+      if (value === null || value === undefined) return 0;
+      if (Number.isInteger(value)) return value;
+      return Math.floor(Number(value)) || 0;
+    };
+  </script>
+
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js
       var loading = document.querySelector('.loading');
       
+      // Criar um link para o arquivo .env em assets
+      const linkElement = document.createElement('link');
+      linkElement.rel = 'prefetch';
+      linkElement.as = 'fetch';
+      linkElement.href = window.envURL;
+      document.head.appendChild(linkElement);
+      
+      // Inicializar Flutter
       _flutter = {};
       _flutter.loader = {};
       
-      // Inicializar Flutter adequadamente
+      // Função para inicializar o Flutter
       _flutter.loader.load = function(options) {
         try {
+          // Expor variáveis para o Dart acessar diretamente
+          window.flutterConfig = {
+            supabaseUrl: window.SUPABASE_URL,
+            supabaseAnonKey: window.SUPABASE_ANON_KEY,
+            supabaseServiceKey: window.SUPABASE_SERVICE_KEY,
+            asaasApiKey: window.ASAAS_API_KEY,
+            asaasSandbox: window.ASAAS_SANDBOX === 'true'
+          };
+          
+          // Criar função ponte para o Dart acessar
+          window.getFlutterConfig = function(key) {
+            return window.flutterConfig[key];
+          };
+          
+          // Carregar o script Dart
           const main = document.createElement('script');
           main.src = 'main.dart.js';
           main.type = 'application/javascript';
