@@ -101,13 +101,11 @@ class _DashboardPageState extends State<DashboardPage> {
         bool isPaid = subscriptionMap['payment_status'] == 'confirmed' || 
                       subscriptionMap['payment_status'] == 'paid';
         
-        // Verificar se é um plano que dá acesso ao dashboard (Básico ou Premium)
-        bool isPlanWithAccess = subscriptionMap['plan_name']?.toLowerCase() == 'premium' || 
-                               subscriptionMap['plan_name']?.toLowerCase() == 'básico' ||
-                               subscriptionMap['plan_name']?.toLowerCase() == 'basico';
+        // Verificar se é um plano premium (que dá acesso ao dashboard)
+        bool isPremium = subscriptionMap['plan_name']?.toLowerCase() == 'premium';
         
-        // Acesso permitido apenas se assinatura estiver ativa e pagamento confirmado
-        hasValidSubscription = isActive && isPaid && isPlanWithAccess;
+        // Acesso permitido apenas se todas as condições forem atendidas
+        hasValidSubscription = isActive && isPaid && isPremium;
         
         debugPrint('Status da assinatura: ${subscriptionMap['status']}');
         debugPrint('Status do pagamento: ${subscriptionMap['payment_status']}');
@@ -119,8 +117,8 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!hasValidSubscription) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Você precisa de uma assinatura Básica ou Premium ativa para acessar o dashboard.'),
+            const SnackBar(
+              content: Text('Você precisa de uma assinatura Premium ativa para acessar o dashboard.'),
               backgroundColor: AppTheme.warningColor,
               duration: Duration(seconds: 5),
             ),
@@ -151,11 +149,9 @@ class _DashboardPageState extends State<DashboardPage> {
       bool isActive = _subscription!['status'] == 'active';
       bool isPaid = _subscription!['payment_status'] == 'confirmed' || 
                     _subscription!['payment_status'] == 'paid';
-      bool isPlanWithAccess = _subscription!['plan_name']?.toLowerCase() == 'premium' || 
-                             _subscription!['plan_name']?.toLowerCase() == 'básico' ||
-                             _subscription!['plan_name']?.toLowerCase() == 'basico';
+      bool isPremium = _subscription!['plan_name']?.toLowerCase() == 'premium';
       
-      hasValidSubscription = isActive && isPaid && isPlanWithAccess;
+      hasValidSubscription = isActive && isPaid && isPremium;
     }
     
     return Scaffold(
@@ -182,12 +178,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     : AppTheme.warningColor.withOpacity(0.2),
                 label: Text(
                   hasValidSubscription
-                      ? _subscription!['plan_name']?.toLowerCase() == 'premium'
-                          ? 'Premium Ativo' 
-                          : 'Básico Ativo'
-                      : _subscription!['plan_name']?.toLowerCase() == 'premium' 
+                      ? 'Premium Ativo' 
+                      : _subscription!['plan_name'] == 'Premium' 
                           ? 'Premium Pendente'
-                          : 'Plano Free',
+                          : 'Básico',
                   style: TextStyle(
                     color: hasValidSubscription
                         ? AppTheme.successColor 
