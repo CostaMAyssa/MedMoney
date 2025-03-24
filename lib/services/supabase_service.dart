@@ -583,7 +583,7 @@ class SupabaseService {
       await client.from('plans').insert([
         {
           'name': 'Basic',
-          'price_monthly': 29.90,
+          'price': 29.90,
           'price_annual': 299.90,
           'setup_fee': 0,
           'features': [
@@ -591,12 +591,12 @@ class SupabaseService {
             'Controle de despesas',
             'Alertas financeiros',
           ],
-          'active': true,
+          'is_active': true,
           'type': 'basic',
         },
         {
           'name': 'Premium',
-          'price_monthly': 59.90,
+          'price': 59.90,
           'price_annual': 599.90,
           'setup_fee': 19.90,
           'features': [
@@ -606,12 +606,12 @@ class SupabaseService {
             'Relatórios detalhados',
             'Consultas financeiras mensais',
           ],
-          'active': true,
+          'is_active': true,
           'type': 'premium',
         },
         {
           'name': 'Enterprise',
-          'price_monthly': 99.90,
+          'price': 99.90,
           'price_annual': 999.90,
           'setup_fee': 0,
           'features': [
@@ -622,7 +622,7 @@ class SupabaseService {
             'Consultoria financeira completa',
             'Acesso multi-usuário',
           ],
-          'active': true,
+          'is_active': true,
           'type': 'enterprise',
         },
       ]);
