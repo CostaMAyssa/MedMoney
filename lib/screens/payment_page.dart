@@ -65,58 +65,33 @@ class _PaymentPageState extends State<PaymentPage> {
         _errorMessage = null;
       });
 
-      // Solução simplificada: gerar um link direto com parâmetros na URL
-      // Isso evita os problemas de CORS ao fazer chamadas diretas à API
-      final planType = widget.planType == 'annual' ? 'Anual' : 'Mensal';
-      final description = 'Assinatura ${widget.planName} ($planType)';
+      // Usar o PaymentProvider para gerar um link de checkout do Asaas
+      final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
-      // Use a URL da sandbox para testes
-      final baseUrl = 'https://sandbox.asaas.com/checkout';
-      
-      // Gerar um código único para referência externa
-      final externalReference = 'medmoney_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // Salvar o plano escolhido pelo usuário no Supabase
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId != null) {
-        await _supabaseService.saveSelectedPlan(
-          userId: userId,
-          planType: widget.planName,
-          billingFrequency: widget.planType,
-          price: widget.totalPrice,
-          externalReference: externalReference,
-          paymentId: null, // Será atualizado quando recebermos o webhook
-        );
-      } else {
-        throw Exception('Usuário não está autenticado');
-      }
-      
-      // Gerar URL do checkout diretamente
-      final checkoutUrl = Uri.parse(baseUrl).replace(queryParameters: {
-        'externalReference': externalReference,
-        'totalValue': widget.totalPrice.toString(),
-        'billingType': 'UNDEFINED', // Permite que o cliente escolha
-        'name': description,
-        'description': 'Assinatura MedMoney - Plano ${widget.planName}',
-        'installments': '1', // Parcela única
-        'showDescription': 'true',
-        'showNoteField': 'false',
-        'dueDate': DateTime.now().add(Duration(days: 7)).toIso8601String().split('T')[0],
-        'maxInstallmentCount': '1',
-        'redirectUrl': 'https://medmoney.app/api/payment/success', // URL de redirecionamento após o pagamento
-        'failureRedirectUrl': 'https://medmoney.app/api/payment/failure', // URL de redirecionamento em caso de falha
-        'notificationEnabled': 'true',
-      }).toString();
+      final checkoutUrl = await paymentProvider.createAsaasCheckout(
+        planName: widget.planName,
+        planType: widget.planType,
+        totalPrice: widget.totalPrice,
+      );
       
       if (!mounted) return;
       
-      setState(() {
-        _paymentUrl = checkoutUrl;
-        _isLoading = false;
-      });
-
-      // Abrir o link de pagamento em uma nova aba
-      html.window.open(_paymentUrl!, '_blank');
+      if (checkoutUrl != null) {
+        setState(() {
+          _paymentUrl = checkoutUrl;
+          _isLoading = false;
+        });
+        
+        // Abrir o link de pagamento em uma nova aba automaticamente
+        html.window.open(_paymentUrl!, '_blank');
+        
+        // Atualizar a UI para mostrar uma mensagem clara
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Não foi possível gerar o link de pagamento');
+      }
     } catch (e) {
       if (mounted) {
         setState(() {

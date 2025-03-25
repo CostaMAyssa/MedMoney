@@ -521,8 +521,50 @@ class PaymentProvider with ChangeNotifier {
     notifyListeners();
     
     try {
+      // Verificar se o usuário está autenticado
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        throw Exception('Usuário não autenticado. Faça login novamente.');
+      }
+      
+      // Obter perfil do usuário
+      Map<String, dynamic> userProfile;
+      try {
+        userProfile = await _supabaseService.getUserProfile();
+      } catch (e) {
+        debugPrint('Erro ao obter perfil do usuário: $e');
+        // Usar dados básicos se não conseguir obter o perfil
+        userProfile = {
+          'name': 'Usuário',
+          'email': user.email ?? 'email@exemplo.com',
+          'phone': '',
+        };
+      }
+      
+      // Gerar referência externa única
+      final externalReference = 'medmoney_${DateTime.now().millisecondsSinceEpoch}';
+      
       // Descrição do pagamento
       final description = 'Assinatura $planName (${planType == 'annual' ? 'Anual' : 'Mensal'})';
+      
+      // Calcular próxima data de cobrança
+      final now = DateTime.now();
+      
+      // Salvar o plano escolhido no Supabase primeiro
+      try {
+        await _supabaseService.saveSelectedPlan(
+          userId: user.id,
+          planType: planName,
+          billingFrequency: planType,
+          price: totalPrice,
+          externalReference: externalReference,
+          paymentId: null, // Será atualizado quando recebermos o webhook
+        );
+        debugPrint('Plano escolhido salvo com sucesso no Supabase');
+      } catch (e) {
+        debugPrint('Erro ao salvar plano escolhido: $e');
+        // Continuar mesmo com erro, pois podemos tentar novamente mais tarde
+      }
       
       // Criar link de pagamento
       final paymentLinkData = await _asaasService.createPaymentLink(
@@ -536,10 +578,13 @@ class PaymentProvider with ChangeNotifier {
       // Salvar dados do pagamento
       _paymentData = paymentLinkData;
       
+      // Atualizar status
+      _status = PaymentStatus.pixGenerated;
+      notifyListeners();
+      
       // Se tudo ocorreu bem, retornar a URL do link de pagamento
       if (paymentLinkData.containsKey('url')) {
-        _status = PaymentStatus.pixGenerated;
-        notifyListeners();
+        debugPrint('Link de pagamento gerado com sucesso: ${paymentLinkData['url']}');
         return paymentLinkData['url'];
       } else {
         throw Exception('URL do link de pagamento não encontrada na resposta');
