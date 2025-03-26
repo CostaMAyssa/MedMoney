@@ -3,7 +3,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 // Configuração
-const webhookUrl = 'http://localhost:3000/webhook/asaas';
+const webhookUrl = 'http://localhost:3000/api/webhook/asaas';
 
 // Cores para o console
 const colors = {

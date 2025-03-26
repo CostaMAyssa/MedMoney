@@ -12,6 +12,7 @@ import '../providers/payment_provider.dart';
 import '../services/asaas_service.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/pix_qr_code.dart';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -65,32 +66,46 @@ class _PaymentPageState extends State<PaymentPage> {
         _errorMessage = null;
       });
 
-      // Usar o PaymentProvider para gerar um link de checkout do Asaas
+      // Usar o PaymentProvider para processar o pagamento via nossa API de webhook
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
-      final checkoutUrl = await paymentProvider.createAsaasCheckout(
+      // Por padrão, vamos iniciar com PIX que é mais fácil e não requer dados adicionais
+      final success = await paymentProvider.processPaymentViaWebhook(
         planName: widget.planName,
         planType: widget.planType,
         totalPrice: widget.totalPrice,
+        billingType: 'PIX',
       );
       
       if (!mounted) return;
       
-      if (checkoutUrl != null) {
-        setState(() {
-          _paymentUrl = checkoutUrl;
-          _isLoading = false;
-        });
+      if (success) {
+        // Dados do pagamento ou assinatura criado
+        final paymentData = paymentProvider.paymentData;
         
-        // Abrir o link de pagamento em uma nova aba automaticamente
-        html.window.open(_paymentUrl!, '_blank');
-        
-        // Atualizar a UI para mostrar uma mensagem clara
-        setState(() {
-          _isLoading = false;
-        });
+        if (paymentData != null) {
+          // Se tiver uma URL de pagamento, mostrar
+          if (paymentData['invoiceUrl'] != null) {
+            setState(() {
+              _paymentUrl = paymentData['invoiceUrl'];
+              _isLoading = false;
+            });
+            
+            // Abrir o link de pagamento em uma nova aba automaticamente
+            html.window.open(_paymentUrl!, '_blank');
+          } else {
+            // Mostrar informações de pagamento na tela
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       } else {
-        throw Exception('Não foi possível gerar o link de pagamento');
+        throw Exception(paymentProvider.errorMessage ?? 'Não foi possível gerar o pagamento');
       }
     } catch (e) {
       if (mounted) {
@@ -198,14 +213,57 @@ class _PaymentPageState extends State<PaymentPage> {
                             Center(
                               child: Column(
                                 children: [
-                                  Text(
-                                    'Uma nova aba foi aberta com a página de pagamento do Asaas.',
-                                    style: TextStyle(
-                                      color: AppTheme.textPrimaryColor,
-                                      fontSize: 16,
+                                  if (provider_pkg.Provider.of<PaymentProvider>(context).paymentData != null && 
+                                      provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['id'] != null && 
+                                      provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['billingType'] == 'PIX')
+                                    FutureBuilder<Map<String, dynamic>>(
+                                      future: provider_pkg.Provider.of<PaymentProvider>(context, listen: false)
+                                        .getSubscriptionPixQrCode(provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['id']),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState == ConnectionState.waiting) {
+                                          return const CircularProgressIndicator();
+                                        } else if (snapshot.hasError) {
+                                          return Text(
+                                            'Erro ao carregar QR code: ${snapshot.error}',
+                                            style: TextStyle(color: AppTheme.errorColor),
+                                            textAlign: TextAlign.center,
+                                          );
+                                        } else if (snapshot.hasData) {
+                                          return Column(
+                                            children: [
+                                              PixQrCode(pixInfo: snapshot.data!['pixQrCode']),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'Escaneie o QR Code acima ou clique no botão abaixo para pagar',
+                                                style: TextStyle(
+                                                  color: AppTheme.textPrimaryColor,
+                                                  fontSize: 14,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
+                                          );
+                                        } else {
+                                          return Text(
+                                            'Uma nova aba foi aberta com a página de pagamento do Asaas.',
+                                            style: TextStyle(
+                                              color: AppTheme.textPrimaryColor,
+                                              fontSize: 16,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          );
+                                        }
+                                      },
+                                    )
+                                  else
+                                    Text(
+                                      'Uma nova aba foi aberta com a página de pagamento do Asaas.',
+                                      style: TextStyle(
+                                        color: AppTheme.textPrimaryColor,
+                                        fontSize: 16,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
                                   const SizedBox(height: 16),
                                   Text(
                                     'Você pode escolher entre PIX, cartão de crédito ou boleto bancário.',

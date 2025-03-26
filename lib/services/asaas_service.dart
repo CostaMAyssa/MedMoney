@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -694,6 +695,184 @@ class AsaasService {
     } catch (e) {
       debugPrint('Erro ao criar link de pagamento no Asaas: $e');
       throw Exception('Não foi possível criar o link de pagamento no Asaas: $e');
+    }
+  }
+
+  // Método para criar cliente usando nossa API de webhook
+  Future<Map<String, dynamic>> createCustomerViaWebhook({
+    required String name,
+    required String email,
+    required String cpfCnpj,
+    String? phone,
+    Map<String, dynamic>? address,
+    required String userId,
+  }) async {
+    try {
+      debugPrint('Criando cliente no Asaas via webhook API...');
+      
+      // Em ambiente web, usar a URL completa com o hostname
+      final webhookUrl = kIsWeb 
+          ? 'http://localhost:3000/api/create-customer'
+          : 'http://localhost:3000/api/create-customer';
+      
+      debugPrint('URL da API de webhook: $webhookUrl');
+      
+      final url = Uri.parse(webhookUrl);
+      
+      final body = jsonEncode({
+        'name': name,
+        'email': email,
+        'cpfCnpj': cpfCnpj.replaceAll(RegExp(r'[^0-9]'), ''), // Remover caracteres não numéricos
+        'phone': phone,
+        'address': address,
+        'userId': userId,
+      });
+      
+      // Adicione logs mais detalhados para debug
+      debugPrint('Enviando requisição com os seguintes dados:');
+      debugPrint('Body: $body');
+      
+      final response = await http.post(
+        url, 
+        headers: {'Content-Type': 'application/json'}, 
+        body: body
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao criar cliente via webhook API');
+        },
+      );
+      
+      debugPrint('Resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        debugPrint('Cliente criado com sucesso via webhook API: ${responseData['customer']['id']}');
+        return responseData['customer'];
+      } else {
+        throw Exception('Falha ao criar cliente: [${response.statusCode}] ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Erro ao criar cliente via webhook API: $e');
+      
+      // Em ambiente de desenvolvimento, retornar um cliente simulado
+      if (kDebugMode) {
+        debugPrint('Retornando cliente simulado para ambiente de desenvolvimento');
+        return {
+          'id': 'cus_000' + DateTime.now().millisecondsSinceEpoch.toString().substring(10),
+          'name': name,
+          'email': email,
+          'cpfCnpj': cpfCnpj,
+          'dateCreated': DateTime.now().toIso8601String()
+        };
+      }
+      
+      throw Exception('Não foi possível criar o cliente: $e');
+    }
+  }
+  
+  // Método para criar pagamento usando nossa API de webhook
+  Future<Map<String, dynamic>> createPaymentViaWebhook({
+    required String customerId,
+    required double value,
+    required String billingType,
+    String? description,
+    String? dueDate,
+    required String userId,
+  }) async {
+    try {
+      debugPrint('Criando pagamento no Asaas via webhook API...');
+      
+      final url = Uri.parse('http://localhost:3000/api/create-payment');
+      
+      final body = jsonEncode({
+        'customerId': customerId,
+        'value': value,
+        'billingType': billingType,
+        'description': description ?? 'Pagamento via MedMoney',
+        'dueDate': dueDate ?? DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T')[0],
+        'userId': userId,
+      });
+      
+      final response = await http.post(
+        url, 
+        headers: {'Content-Type': 'application/json'}, 
+        body: body
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao criar pagamento via webhook API');
+        },
+      );
+      
+      debugPrint('Resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        debugPrint('Pagamento criado com sucesso via webhook API: ${responseData['payment']['id']}');
+        return responseData['payment'];
+      } else {
+        throw Exception('Falha ao criar pagamento: [${response.statusCode}] ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Erro ao criar pagamento via webhook API: $e');
+      throw Exception('Não foi possível criar o pagamento: $e');
+    }
+  }
+  
+  // Método para criar assinatura usando nossa API de webhook
+  Future<Map<String, dynamic>> createSubscriptionViaWebhook({
+    required String customerId,
+    required double value,
+    required String billingType,
+    required String cycle,
+    String? description,
+    String? nextDueDate,
+    required String userId,
+    String? planId,
+  }) async {
+    try {
+      debugPrint('Criando assinatura no Asaas via webhook API...');
+      
+      final url = Uri.parse('http://localhost:3000/api/create-subscription');
+      
+      final body = jsonEncode({
+        'customerId': customerId,
+        'value': value,
+        'billingType': billingType,
+        'cycle': cycle, // 'MONTHLY' ou 'YEARLY'
+        'description': description ?? 'Assinatura MedMoney',
+        'nextDueDate': nextDueDate ?? DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T')[0],
+        'userId': userId,
+        'planId': planId,
+      });
+      
+      final response = await http.post(
+        url, 
+        headers: {'Content-Type': 'application/json'}, 
+        body: body
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao criar assinatura via webhook API');
+        },
+      );
+      
+      debugPrint('Resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        debugPrint('Assinatura criada com sucesso via webhook API: ${responseData['subscription']['id']}');
+        return responseData['subscription'];
+      } else {
+        throw Exception('Falha ao criar assinatura: [${response.statusCode}] ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Erro ao criar assinatura via webhook API: $e');
+      throw Exception('Não foi possível criar a assinatura: $e');
     }
   }
 } 

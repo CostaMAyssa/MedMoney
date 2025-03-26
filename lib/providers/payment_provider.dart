@@ -3,6 +3,8 @@ import '../services/asaas_service.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 enum PaymentStatus {
   initial,
@@ -379,6 +381,106 @@ class PaymentProvider with ChangeNotifier {
     }
   }
   
+  // Processar pagamento usando nossa nova API de webhook
+  Future<bool> processPaymentViaWebhook({
+    required String planName,
+    required String planType,
+    required double totalPrice,
+    required String billingType, // 'PIX', 'CREDIT_CARD', 'BOLETO'
+  }) async {
+    _status = PaymentStatus.processing;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      
+      // Obter perfil do usuário
+      Map<String, dynamic> userProfile;
+      try {
+        userProfile = await _supabaseService.getUserProfile();
+      } catch (e) {
+        debugPrint('Erro ao obter perfil do usuário: $e');
+        // Usar dados básicos se não conseguir obter o perfil
+        userProfile = {
+          'name': 'Usuário',
+          'email': user.email ?? 'email@exemplo.com',
+          'phone': '',
+        };
+      }
+      
+      // Criar ou obter cliente no Asaas via nossa API
+      Map<String, dynamic> customer;
+      try {
+        customer = await _asaasService.createCustomerViaWebhook(
+          name: userProfile['name'] ?? 'Usuário',
+          email: userProfile['email'] ?? user.email ?? 'email@exemplo.com',
+          cpfCnpj: userProfile['cpf_cnpj'] ?? '12345678909', // CPF fictício para teste
+          phone: userProfile['phone'],
+          userId: user.id,
+        );
+      } catch (e) {
+        debugPrint('Erro ao criar cliente no Asaas via webhook: $e');
+        _status = PaymentStatus.failed;
+        _errorMessage = 'Não foi possível criar o cliente: ${e.toString()}';
+        notifyListeners();
+        return false;
+      }
+      
+      // Descrição do pagamento
+      final description = 'Assinatura $planName (${planType == 'annual' ? 'Anual' : 'Mensal'})';
+      
+      // Criar pagamento ou assinatura
+      try {
+        if (planType == 'single') {
+          // Criar pagamento único
+          final paymentResponse = await _asaasService.createPaymentViaWebhook(
+            customerId: customer['id'],
+            value: totalPrice,
+            billingType: billingType,
+            description: description,
+            userId: user.id,
+          );
+          
+          _paymentData = paymentResponse;
+          _status = PaymentStatus.success;
+          notifyListeners();
+          return true;
+        } else {
+          // Criar assinatura (mensal ou anual)
+          final subscriptionResponse = await _asaasService.createSubscriptionViaWebhook(
+            customerId: customer['id'],
+            value: totalPrice,
+            billingType: billingType,
+            cycle: planType == 'annual' ? 'YEARLY' : 'MONTHLY',
+            description: description,
+            userId: user.id,
+          );
+          
+          _paymentData = subscriptionResponse;
+          _status = PaymentStatus.success;
+          notifyListeners();
+          return true;
+        }
+      } catch (e) {
+        debugPrint('Erro ao criar pagamento/assinatura: $e');
+        _status = PaymentStatus.failed;
+        _errorMessage = 'Falha ao processar pagamento: ${e.toString()}';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Erro geral ao processar pagamento via webhook: $e');
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Erro ao processar pagamento: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+  
   // Limpar erro
   void clearError() {
     _errorMessage = null;
@@ -508,6 +610,44 @@ class PaymentProvider with ChangeNotifier {
     });
     
     return isConfirmed;
+  }
+  
+  // Método para obter o QR code PIX de uma assinatura
+  Future<Map<String, dynamic>> getSubscriptionPixQrCode(String subscriptionId) async {
+    try {
+      _errorMessage = null;
+      notifyListeners();
+      
+      debugPrint('Obtendo QR code PIX para assinatura: $subscriptionId');
+      
+      // Utilizamos nossa API de webhook para obter o QR code PIX
+      final url = Uri.parse('http://localhost:3000/api/subscription/$subscriptionId/pix');
+      
+      final response = await http.get(
+        url,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao obter QR code PIX');
+        },
+      );
+      
+      debugPrint('Resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body.substring(0, response.body.length > 100 ? 100 : response.body.length)}...');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return responseData;
+      } else {
+        throw Exception('Falha ao obter QR code PIX: [${response.statusCode}] ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Erro ao obter QR code PIX: $e');
+      _errorMessage = 'Erro ao obter QR code PIX: $e';
+      notifyListeners();
+      throw Exception('Não foi possível obter o QR code PIX: $e');
+    }
   }
   
   // Método para criar um link de pagamento do Asaas

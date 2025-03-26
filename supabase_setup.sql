@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 -- Criação da tabela de logs Asaas
 CREATE TABLE IF NOT EXISTS asaas_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type TEXT NOT NULL,
     payment_id TEXT,
     external_reference TEXT,
     status TEXT,
