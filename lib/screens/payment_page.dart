@@ -13,6 +13,9 @@ import '../services/asaas_service.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/pix_qr_code.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 
 class PaymentPage extends StatefulWidget {
   final String planName;
@@ -83,27 +86,9 @@ class _PaymentPageState extends State<PaymentPage> {
         // Dados do pagamento ou assinatura criado
         final paymentData = paymentProvider.paymentData;
         
-        if (paymentData != null) {
-          // Se tiver uma URL de pagamento, mostrar
-          if (paymentData['invoiceUrl'] != null) {
-            setState(() {
-              _paymentUrl = paymentData['invoiceUrl'];
-              _isLoading = false;
-            });
-            
-            // Abrir o link de pagamento em uma nova aba automaticamente
-            html.window.open(_paymentUrl!, '_blank');
-          } else {
-            // Mostrar informações de pagamento na tela
-            setState(() {
-              _isLoading = false;
-            });
-          }
-        } else {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _isLoading = false;
+        });
       } else {
         throw Exception(paymentProvider.errorMessage ?? 'Não foi possível gerar o pagamento');
       }
@@ -117,284 +102,249 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  // Método para processar o QRCode PIX
+  Widget _buildPixQrCode(BuildContext context, Map<String, dynamic>? paymentData) {
+    if (paymentData == null || paymentData['billingType'] != 'PIX') {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: provider_pkg.Provider.of<PaymentProvider>(context, listen: false)
+          .getSubscriptionPixQrCode(paymentData['id']),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Carregando QR code PIX...'),
+              ],
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Erro ao carregar QR code PIX: ${snapshot.error}');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text('Erro ao carregar QR code PIX: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {}); // Força reconstrução para tentar novamente
+                  },
+                  child: const Text('Tentar novamente'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || 
+            (snapshot.data?['pixQrCode'] == null && 
+             snapshot.data?['subscription']?['firstPayment']?['pix'] == null)) {
+          return const Center(
+            child: Text('QR code PIX não disponível. Tente novamente mais tarde.'),
+          );
+        }
+
+        // Extrair o QR code PIX da resposta
+        final pixData = snapshot.data!['pixQrCode'] ?? 
+                        snapshot.data!['subscription']?['firstPayment']?['pix'];
+        
+        if (pixData == null) {
+          return const Center(
+            child: Text('QR code PIX não disponível. Tente novamente mais tarde.'),
+          );
+        }
+
+        final String? qrCode = pixData['encodedImage'] ?? pixData['qrCode'];
+        final String? pixKey = pixData['payload'] ?? pixData['copy'];
+
+        if (qrCode == null) {
+          return const Center(
+            child: Text('QR code PIX não disponível. Tente novamente mais tarde.'),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Escaneie o QR code PIX',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              // Exibir o QR code como imagem
+              Image.memory(
+                base64Decode(qrCode.replaceAll(RegExp(r'data:image/[^;]+;base64,'), '')),
+                width: 200,
+                height: 200,
+              ),
+              const SizedBox(height: 16),
+              if (pixKey != null) ...[
+                const Text(
+                  'Ou copie o código PIX:',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          pixKey,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: pixKey));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Código PIX copiado!'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              const Text(
+                'Importante: Após realizar o pagamento, aguarde a confirmação que será enviada automaticamente.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            AppHeader(),
-            
-            ResponsiveContainer(
-              padding: EdgeInsets.symmetric(
-                horizontal: Responsive.isMobile(context) ? 16 : 32,
-                vertical: 64,
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'Finalizar Assinatura',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Complete o pagamento para ativar sua assinatura',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppTheme.textSecondaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  
-                  if (_errorMessage != null)
-                    Container(
-                      margin: const EdgeInsets.only(top: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: AppTheme.errorColor),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(color: AppTheme.errorColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // Card de pagamento
-                  Card(
-                    elevation: 4,
-                    color: const Color(0xFF1A1A4F),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Resumo da compra
-                          Text(
-                            'Resumo da compra',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          
-                          // Detalhes do plano
-                          _buildPlanDetails(),
-                          const SizedBox(height: 32),
-                          
-                          if (_isLoading)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(32),
-                                child: CircularProgressIndicator(),
-                              ),
-                            )
-                          else if (_paymentUrl != null)
-                            Center(
-                              child: Column(
-                                children: [
-                                  if (provider_pkg.Provider.of<PaymentProvider>(context).paymentData != null && 
-                                      provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['id'] != null && 
-                                      provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['billingType'] == 'PIX')
-                                    FutureBuilder<Map<String, dynamic>>(
-                                      future: provider_pkg.Provider.of<PaymentProvider>(context, listen: false)
-                                        .getSubscriptionPixQrCode(provider_pkg.Provider.of<PaymentProvider>(context).paymentData!['id']),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return const CircularProgressIndicator();
-                                        } else if (snapshot.hasError) {
-                                          return Text(
-                                            'Erro ao carregar QR code: ${snapshot.error}',
-                                            style: TextStyle(color: AppTheme.errorColor),
-                                            textAlign: TextAlign.center,
-                                          );
-                                        } else if (snapshot.hasData) {
-                                          return Column(
-                                            children: [
-                                              PixQrCode(pixInfo: snapshot.data!['pixQrCode']),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                'Escaneie o QR Code acima ou clique no botão abaixo para pagar',
-                                                style: TextStyle(
-                                                  color: AppTheme.textPrimaryColor,
-                                                  fontSize: 14,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ],
-                                          );
-                                        } else {
-                                          return Text(
-                                            'Uma nova aba foi aberta com a página de pagamento do Asaas.',
-                                            style: TextStyle(
-                                              color: AppTheme.textPrimaryColor,
-                                              fontSize: 16,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          );
-                                        }
-                                      },
-                                    )
-                                  else
-                                    Text(
-                                      'Uma nova aba foi aberta com a página de pagamento do Asaas.',
-                                      style: TextStyle(
-                                        color: AppTheme.textPrimaryColor,
-                                        fontSize: 16,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Você pode escolher entre PIX, cartão de crédito ou boleto bancário.',
-                                    style: TextStyle(
-                                      color: AppTheme.textSecondaryColor,
-                                      fontSize: 14,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Center(
-                              child: Text(
-                                'Erro ao carregar o sistema de pagamento',
-                                style: TextStyle(
-                                  color: AppTheme.errorColor,
-                                  fontSize: 16,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Botões
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (_paymentUrl != null) ...[
-                                CustomButton(
-                                  text: 'Reabrir página de pagamento',
-                                  onPressed: () {
-                                    if (_paymentUrl != null) {
-                                      html.window.open(_paymentUrl!, '_blank');
-                                    }
-                                  },
-                                  type: ButtonType.primary,
-                                ),
-                                const SizedBox(width: 16),
-                              ],
-                              CustomButton(
-                                text: 'Voltar para o Dashboard',
-                                onPressed: () {
-                                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-                                },
-                                type: ButtonType.secondary,
-                              ),
-                            ],
-                          ),
+    final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context);
+    final paymentData = paymentProvider.paymentData;
 
-                          // Botão para abrir novamente a página de pagamento
-                          ElevatedButton(
-                            onPressed: () {
-                              if (_paymentUrl != null) {
-                                html.window.open(_paymentUrl!, '_blank');
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            ),
-                            child: const Text('Tentar Novamente'),
-                          ),
-                          const SizedBox(height: 16),
-                          // Botão para verificar status da assinatura
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/subscription_status');
-                            },
-                            child: const Text('Verificar Status da Assinatura'),
-                          ),
-                        ],
-                      ),
-                    ),
+    return Scaffold(
+      appBar: const AppHeader(
+        showBackButton: true,
+      ),
+      body: _isLoading 
+        ? const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Gerando pagamento...'),
+              ],
+            ),
+          )
+        : _errorMessage != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(_errorMessage!),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _initializePayment();
+                    },
+                    child: const Text('Tentar novamente'),
                   ),
                 ],
               ),
+            )
+          : SingleChildScrollView(
+              child: ResponsiveContainer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Pagamento',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Plano: ${widget.planName}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tipo: ${widget.planType}',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Valor: R\$ ${widget.planPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            if (widget.setupFee > 0) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Taxa de setup: R\$ ${widget.setupFee.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Text(
+                              'Total: R\$ ${widget.totalPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // QR Code PIX (se disponível)
+                    _buildPixQrCode(context, paymentData),
+                    
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             ),
-            
-            AppFooter(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlanDetails() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSummaryItem(
-          'Plano ${widget.planName} (${widget.planType == 'annual' ? 'Anual' : 'Mensal'})',
-          'R\$ ${widget.planPrice.toStringAsFixed(2)}',
-        ),
-        const SizedBox(height: 8),
-        _buildSummaryItem(
-          'Taxa de setup',
-          'R\$ ${widget.setupFee.toStringAsFixed(2)}',
-        ),
-        const Divider(height: 32, color: Color(0xFF2A2A5F)),
-        _buildSummaryItem(
-          'Total',
-          'R\$ ${widget.totalPrice.toStringAsFixed(2)}',
-          isTotal: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryItem(String label, String value, {bool isTotal = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 18 : 16,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isTotal ? AppTheme.textPrimaryColor : AppTheme.textSecondaryColor,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isTotal ? 18 : 16,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isTotal ? AppTheme.primaryColor : AppTheme.textPrimaryColor,
-          ),
-        ),
-      ],
+      bottomNavigationBar: AppFooter(),
     );
   }
 } 

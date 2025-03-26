@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 enum PaymentStatus {
   initial,
@@ -433,6 +434,9 @@ class PaymentProvider with ChangeNotifier {
       // Descrição do pagamento
       final description = 'Assinatura $planName (${planType == 'annual' ? 'Anual' : 'Mensal'})';
       
+      // Data de vencimento (hoje + 1 dia)
+      final dueDate = DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T')[0];
+      
       // Criar pagamento ou assinatura
       try {
         if (planType == 'single') {
@@ -442,6 +446,7 @@ class PaymentProvider with ChangeNotifier {
             value: totalPrice,
             billingType: billingType,
             description: description,
+            dueDate: dueDate,
             userId: user.id,
           );
           
@@ -451,12 +456,15 @@ class PaymentProvider with ChangeNotifier {
           return true;
         } else {
           // Criar assinatura (mensal ou anual)
+          final cycle = planType == 'annual' ? 'YEARLY' : 'MONTHLY';
+          
           final subscriptionResponse = await _asaasService.createSubscriptionViaWebhook(
             customerId: customer['id'],
             value: totalPrice,
             billingType: billingType,
-            cycle: planType == 'annual' ? 'YEARLY' : 'MONTHLY',
+            cycle: cycle,
             description: description,
+            nextDueDate: dueDate,
             userId: user.id,
           );
           
@@ -581,33 +589,27 @@ class PaymentProvider with ChangeNotifier {
     
     debugPrint('Iniciando verificação periódica do pagamento: $paymentId');
     
-    // Verificar o status a cada 30 segundos
-    Timer.periodic(const Duration(seconds: 30), (timer) async {
-      attempts++;
-      debugPrint('Verificação $attempts de $maxAttempts');
-      
-      // Verificar o status do pagamento
-      final status = await checkPaymentStatus(paymentId);
-      
-      // Se o pagamento foi confirmado ou o número máximo de tentativas foi atingido
-      if (status != null && 
-          (status['status'] == 'CONFIRMED' || 
-           status['status'] == 'RECEIVED' || 
-           status['status'] == 'RECEIVED_IN_CASH')) {
+    while (attempts < maxAttempts && !isConfirmed) {
+      try {
+        final paymentStatus = await checkPaymentStatus(paymentId);
         
+        if (paymentStatus != null && 
+            (paymentStatus['status'] == 'CONFIRMED' || 
+             paymentStatus['status'] == 'RECEIVED' ||
+             paymentStatus['status'] == 'RECEIVED_IN_CASH')) {
+          debugPrint('Pagamento confirmado após ${attempts + 1} tentativas');
         isConfirmed = true;
-        timer.cancel();
+          break;
+        }
         
-        // Notificar os ouvintes
-        _status = PaymentStatus.success;
-        notifyListeners();
-        
-        debugPrint('Pagamento confirmado!');
-      } else if (attempts >= maxAttempts) {
-        timer.cancel();
-        debugPrint('Número máximo de tentativas atingido');
+        attempts++;
+        await Future.delayed(Duration(seconds: 3 + attempts));
+      } catch (e) {
+        debugPrint('Erro na verificação #$attempts: $e');
+        attempts++;
+        await Future.delayed(Duration(seconds: 3));
       }
-    });
+    }
     
     return isConfirmed;
   }
@@ -620,8 +622,25 @@ class PaymentProvider with ChangeNotifier {
       
       debugPrint('Obtendo QR code PIX para assinatura: $subscriptionId');
       
+      // Definir URL da API do webhook (local ou produção)
+      String webhookBaseUrl;
+      
+      if (kIsWeb) {
+        // Em produção ou desenvolvimento web, usar a URL de API correspondente
+        if (kReleaseMode) {
+          // URL de produção
+          webhookBaseUrl = 'https://medmoney.me:82';
+        } else {
+          // URL de desenvolvimento
+          webhookBaseUrl = 'http://localhost:3000';
+        }
+      } else {
+        // Em dispositivos móveis, usar a URL de API de produção
+        webhookBaseUrl = 'https://medmoney.me:82';
+      }
+      
       // Utilizamos nossa API de webhook para obter o QR code PIX
-      final url = Uri.parse('http://localhost:3000/api/subscription/$subscriptionId/pix');
+      final url = Uri.parse('$webhookBaseUrl/api/subscription/$subscriptionId/pix');
       
       final response = await http.get(
         url,
@@ -634,10 +653,55 @@ class PaymentProvider with ChangeNotifier {
       );
       
       debugPrint('Resposta: ${response.statusCode}');
-      debugPrint('Corpo da resposta: ${response.body.substring(0, response.body.length > 100 ? 100 : response.body.length)}...');
+      if (response.body.length > 100) {
+        debugPrint('Corpo da resposta: ${response.body.substring(0, 100)}...');
+      } else {
+        debugPrint('Corpo da resposta: ${response.body}');
+      }
       
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        // Verifica se o QR code PIX está na resposta direta
+        if (responseData['pixQrCode'] != null) {
+          return responseData;
+        }
+        
+        // Verifica se a resposta inclui uma assinatura com primeiro pagamento contendo PIX
+        final subscription = responseData['subscription'] as Map<String, dynamic>?;
+        if (subscription != null) {
+          final firstPayment = subscription['firstPayment'] as Map<String, dynamic>?;
+          if (firstPayment != null && firstPayment['pix'] != null) {
+            return {
+              'subscription': subscription,
+              'pixQrCode': firstPayment['pix']
+            };
+          }
+        }
+        
+        // Caso não tenha encontrado QR code PIX, verificar se temos o paymentData
+        final paymentData = _paymentData;
+        if (paymentData != null) {
+          // Verifica se temos um first payment com pix
+          final firstPayment = paymentData['firstPayment'] as Map<String, dynamic>?;
+          if (firstPayment != null && firstPayment['pix'] != null) {
+            return {
+              'subscription': paymentData,
+              'pixQrCode': firstPayment['pix']
+            };
+          }
+          
+          // Verifica se temos um campo pix direto
+          final pix = paymentData['pix'];
+          if (pix != null) {
+            return {
+              'subscription': paymentData,
+              'pixQrCode': pix
+            };
+          }
+        }
+        
+        // Retornar os dados da resposta de qualquer forma
         return responseData;
       } else {
         throw Exception('Falha ao obter QR code PIX: [${response.statusCode}] ${response.body}');
@@ -646,6 +710,27 @@ class PaymentProvider with ChangeNotifier {
       debugPrint('Erro ao obter QR code PIX: $e');
       _errorMessage = 'Erro ao obter QR code PIX: $e';
       notifyListeners();
+      
+      // Mesmo com erro, se tivermos _paymentData com pix, retornar
+      final paymentData = _paymentData;
+      if (paymentData != null) {
+        final pix = paymentData['pix'];
+        if (pix != null) {
+          return {
+            'subscription': paymentData,
+            'pixQrCode': pix
+          };
+        }
+        
+        final firstPayment = paymentData['firstPayment'] as Map<String, dynamic>?;
+        if (firstPayment != null && firstPayment['pix'] != null) {
+          return {
+            'subscription': paymentData,
+            'pixQrCode': firstPayment['pix']
+          };
+        }
+      }
+      
       throw Exception('Não foi possível obter o QR code PIX: $e');
     }
   }

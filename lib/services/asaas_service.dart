@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:math';
 
 class AsaasService {
   // Singleton pattern
@@ -704,33 +705,40 @@ class AsaasService {
     required String email,
     required String cpfCnpj,
     String? phone,
-    Map<String, dynamic>? address,
     required String userId,
   }) async {
     try {
       debugPrint('Criando cliente no Asaas via webhook API...');
       
-      // Em ambiente web, usar a URL completa com o hostname
-      final webhookUrl = kIsWeb 
-          ? 'http://localhost:3000/api/create-customer'
-          : 'http://localhost:3000/api/create-customer';
+      // Definir URL da API do webhook (local ou produção)
+      String webhookBaseUrl;
       
-      debugPrint('URL da API de webhook: $webhookUrl');
+      if (kIsWeb) {
+        // Em produção ou desenvolvimento web, usar a URL de API correspondente
+        if (kReleaseMode) {
+          // URL de produção
+          webhookBaseUrl = 'https://medmoney.me:82';
+        } else {
+          // URL de desenvolvimento
+          webhookBaseUrl = 'http://localhost:3000';
+        }
+      } else {
+        // Em dispositivos móveis, usar a URL de API de produção
+        webhookBaseUrl = 'https://medmoney.me:82';
+      }
       
-      final url = Uri.parse(webhookUrl);
+      final url = Uri.parse('$webhookBaseUrl/api/create-customer');
       
       final body = jsonEncode({
         'name': name,
         'email': email,
         'cpfCnpj': cpfCnpj.replaceAll(RegExp(r'[^0-9]'), ''), // Remover caracteres não numéricos
         'phone': phone,
-        'address': address,
         'userId': userId,
       });
       
-      // Adicione logs mais detalhados para debug
-      debugPrint('Enviando requisição com os seguintes dados:');
-      debugPrint('Body: $body');
+      debugPrint('Enviando requisição para: $url');
+      debugPrint('Corpo da requisição: $body');
       
       final response = await http.post(
         url, 
@@ -755,19 +763,18 @@ class AsaasService {
       }
     } catch (e) {
       debugPrint('Erro ao criar cliente via webhook API: $e');
-      
-      // Em ambiente de desenvolvimento, retornar um cliente simulado
+      // Em desenvolvimento, vamos criar um cliente simulado para não interromper o fluxo
       if (kDebugMode) {
-        debugPrint('Retornando cliente simulado para ambiente de desenvolvimento');
+        debugPrint('Retornando cliente simulado para desenvolvimento');
         return {
-          'id': 'cus_000' + DateTime.now().millisecondsSinceEpoch.toString().substring(10),
+          'id': 'cus_000${Random().nextInt(10000)}',
           'name': name,
           'email': email,
           'cpfCnpj': cpfCnpj,
-          'dateCreated': DateTime.now().toIso8601String()
+          'phone': phone,
+          'simulated': true,
         };
       }
-      
       throw Exception('Não foi possível criar o cliente: $e');
     }
   }
@@ -784,13 +791,30 @@ class AsaasService {
     try {
       debugPrint('Criando pagamento no Asaas via webhook API...');
       
-      final url = Uri.parse('http://localhost:3000/api/create-payment');
+      // Definir URL da API do webhook (local ou produção)
+      String webhookBaseUrl;
+      
+      if (kIsWeb) {
+        // Em produção ou desenvolvimento web, usar a URL de API correspondente
+        if (kReleaseMode) {
+          // URL de produção
+          webhookBaseUrl = 'https://medmoney.me:82';
+        } else {
+          // URL de desenvolvimento
+          webhookBaseUrl = 'http://localhost:3000';
+        }
+      } else {
+        // Em dispositivos móveis, usar a URL de API de produção
+        webhookBaseUrl = 'https://medmoney.me:82';
+      }
+      
+      final url = Uri.parse('$webhookBaseUrl/api/create-payment');
       
       final body = jsonEncode({
         'customerId': customerId,
         'value': value,
         'billingType': billingType,
-        'description': description ?? 'Pagamento via MedMoney',
+        'description': description ?? 'Pagamento MedMoney',
         'dueDate': dueDate ?? DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T')[0],
         'userId': userId,
       });
@@ -836,7 +860,24 @@ class AsaasService {
     try {
       debugPrint('Criando assinatura no Asaas via webhook API...');
       
-      final url = Uri.parse('http://localhost:3000/api/create-subscription');
+      // Definir URL da API do webhook (local ou produção)
+      String webhookBaseUrl;
+      
+      if (kIsWeb) {
+        // Em produção ou desenvolvimento web, usar a URL de API correspondente
+        if (kReleaseMode) {
+          // URL de produção
+          webhookBaseUrl = 'https://medmoney.me:82';
+        } else {
+          // URL de desenvolvimento
+          webhookBaseUrl = 'http://localhost:3000';
+        }
+      } else {
+        // Em dispositivos móveis, usar a URL de API de produção
+        webhookBaseUrl = 'https://medmoney.me:82';
+      }
+      
+      final url = Uri.parse('$webhookBaseUrl/api/create-subscription');
       
       final body = jsonEncode({
         'customerId': customerId,

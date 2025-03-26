@@ -20,9 +20,13 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
 
-// Logs para depuração
-console.log('ASAAS_API_KEY:', ASAAS_API_KEY ? (ASAAS_API_KEY.substring(0, 5) + '...') : 'não configurada');
-console.log('ASAAS_API_URL:', ASAAS_API_URL);
+// Verificar se estamos em ambiente de produção ou desenvolvimento
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Logs para depuração em ambiente de desenvolvimento
+console.log(`Ambiente: ${isProduction ? 'Produção' : 'Desenvolvimento'}`);
+console.log(`URL da API Asaas: ${ASAAS_API_URL}`);
+console.log(`URL do Supabase: ${SUPABASE_URL}`);
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Erro: Variáveis de ambiente do Supabase não configuradas!');
@@ -199,11 +203,57 @@ app.post('/api/create-customer', async (req, res) => {
       });
     }
     
-    console.log('Enviando requisição para o Asaas...');
-    console.log('URL:', `${ASAAS_API_URL}/customers`);
-    
-    // Em ambiente de desenvolvimento, retornar sucesso simulado
-    if (process.env.NODE_ENV === 'development' || !ASAAS_API_KEY) {
+    // Em ambiente de produção, sempre enviar para o Asaas
+    // Em desenvolvimento, verificar se a chave existe
+    if (isProduction || ASAAS_API_KEY) {
+      console.log('Enviando requisição para o Asaas (produção)...');
+      console.log('URL:', `${ASAAS_API_URL}/customers`);
+      
+      // Enviar requisição para o Asaas (produção)
+      const response = await axios.post(`${ASAAS_API_URL}/customers`, {
+        name,
+        email,
+        cpfCnpj: cpfCnpj.replace(/\D/g, ''),
+        phone,
+        address: address?.street,
+        addressNumber: address?.number,
+        complement: address?.complement,
+        province: address?.neighborhood,
+        postalCode: address?.postalCode,
+        externalReference: req.body.userId, // ID do usuário no seu sistema
+        notificationDisabled: false
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': ASAAS_API_KEY
+        }
+      });
+      
+      console.log('Resposta do Asaas:', response.status);
+      console.log('Dados da resposta:', JSON.stringify(response.data));
+      
+      // Se o cliente foi criado com sucesso, atualizar o perfil no Supabase
+      if (response.data && response.data.id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            asaas_customer_id: response.data.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', req.body.userId);
+          
+        if (error) {
+          console.error('Erro ao atualizar perfil:', error);
+          // Não retornar erro, apenas logar
+        }
+      }
+      
+      return res.status(200).json({
+        success: true,
+        customer: response.data,
+        timestamp: new Date().toISOString()
+      });
+    } else {
       console.log('Ambiente de desenvolvimento. Retornando cliente simulado.');
       const mockCustomer = {
         id: 'cus_000' + Math.floor(Math.random() * 1000000),
@@ -243,52 +293,6 @@ app.post('/api/create-customer', async (req, res) => {
       });
     }
     
-    // Enviar requisição para o Asaas (produção)
-    const response = await axios.post(`${ASAAS_API_URL}/customers`, {
-      name,
-      email,
-      cpfCnpj: cpfCnpj.replace(/[^0-9]/g, ''),
-      phone,
-      mobilePhone: phone,
-      address: address?.street,
-      addressNumber: address?.number,
-      complement: address?.complement,
-      province: address?.neighborhood,
-      postalCode: address?.postalCode,
-      externalReference: req.body.userId, // ID do usuário no seu sistema
-      notificationDisabled: false
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY
-      }
-    });
-    
-    console.log('Resposta do Asaas:', response.status);
-    console.log('Dados da resposta:', JSON.stringify(response.data));
-    
-    // Se o cliente foi criado com sucesso, atualizar o perfil no Supabase
-    if (response.data && response.data.id) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          asaas_customer_id: response.data.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', req.body.userId);
-        
-      if (error) {
-        console.error('Erro ao atualizar perfil:', error);
-        // Não retornar erro, apenas logar
-      }
-    }
-    
-    return res.status(200).json({
-      success: true,
-      customer: response.data,
-      timestamp: new Date().toISOString()
-    });
-    
   } catch (error) {
     console.error('Erro ao criar cliente no Asaas:', error.response?.data || error.message);
     console.error('Stack trace:', error.stack);
@@ -300,22 +304,20 @@ app.post('/api/create-customer', async (req, res) => {
   }
 });
 
-// Rota para criar um pagamento no Asaas
+// Rota para criar um pagamento (cobrança)
 app.post('/api/create-payment', async (req, res) => {
   try {
-    console.log('Recebida requisição para criar pagamento:', JSON.stringify(req.body));
-    const { 
-      customerId, 
-      value, 
-      dueDate, 
-      description, 
+    const {
+      customerId,
+      value,
       billingType,
+      description,
+      dueDate,
       userId
     } = req.body;
     
     // Validar campos obrigatórios
     if (!customerId || !value || !billingType) {
-      console.log('Dados incompletos:', { customerId, value, billingType });
       return res.status(400).json({
         error: 'Dados incompletos',
         message: 'ID do cliente, valor e tipo de cobrança são obrigatórios',
@@ -326,9 +328,34 @@ app.post('/api/create-payment', async (req, res) => {
     console.log('Enviando requisição para o Asaas...');
     console.log('URL:', `${ASAAS_API_URL}/payments`);
     
+    // Estruturando os dados conforme documentação do Asaas
+    const paymentData = {
+      customer: customerId,
+      billingType: billingType, // PIX, BOLETO, CREDIT_CARD, etc
+      value: value,
+      dueDate: dueDate || new Date().toISOString().split('T')[0],
+      description: description || 'Pagamento MedMoney',
+      externalReference: userId || null,
+      // Campos específicos para PIX
+      ...(billingType === 'PIX' && {
+        discount: {
+          value: 0,
+          dueDateLimitDays: 0
+        },
+        interest: {
+          value: 0
+        },
+        fine: {
+          value: 0
+        },
+        postalService: false
+      })
+    };
+    
     // Em ambiente de desenvolvimento, retornar sucesso simulado
     if (process.env.NODE_ENV === 'development' || !ASAAS_API_KEY) {
       console.log('Ambiente de desenvolvimento. Retornando pagamento simulado.');
+      console.log('Dados que seriam enviados:', JSON.stringify(paymentData));
       
       // Definir URL de pagamento baseado no tipo de cobrança
       let invoiceUrl = null;
@@ -336,58 +363,63 @@ app.post('/api/create-payment', async (req, res) => {
       
       if (billingType === 'PIX') {
         invoiceUrl = 'https://sandbox.asaas.com/i/' + Math.random().toString(36).substring(2, 10);
-        status = 'PENDING';
-      } else if (billingType === 'BOLETO') {
-        invoiceUrl = 'https://sandbox.asaas.com/i/' + Math.random().toString(36).substring(2, 10);
-        status = 'PENDING';
-      } else if (billingType === 'CREDIT_CARD') {
-        status = 'CONFIRMED';
-      }
-      
-      const mockPayment = {
-        id: 'pay_' + Math.floor(Math.random() * 1000000),
-        customer: customerId,
-        value: value,
-        netValue: value,
-        billingType: billingType,
-        status: status,
-        dueDate: dueDate || new Date().toISOString().split('T')[0],
-        invoiceUrl: invoiceUrl,
-        description: description || 'Pagamento via MedMoney',
-        externalReference: userId,
-        dateCreated: new Date().toISOString()
-      };
-      
-      // Também registramos no log de webhooks para ter um histórico
-      try {
-        await supabase.from('asaas_logs').insert({
-          event_type: 'PAYMENT_CREATED',
-          webhook_data: mockPayment,
-          processed: true,
-          created_at: new Date().toISOString()
+        
+        // Dados do PIX para desenvolvimento
+        const mockPayment = {
+          id: 'pay_' + Math.floor(Math.random() * 1000000),
+          customer: customerId,
+          value: value,
+          netValue: value,
+          billingType: billingType,
+          status: status,
+          dueDate: dueDate || new Date().toISOString().split('T')[0],
+          description: description || 'Pagamento MedMoney',
+          invoiceUrl: invoiceUrl,
+          invoiceNumber: String(Math.floor(Math.random() * 100000)),
+          externalReference: userId,
+          deleted: false,
+          postalService: false,
+          dateCreated: new Date().toISOString()
+        };
+        
+        // Gerar dados do QR code PIX
+        const mockPixData = {
+          encodedImage: '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',
+          payload: 'pix://https://sandbox.asaas.com/i/' + Math.random().toString(36).substring(2, 10),
+          expirationDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        };
+        
+        mockPayment.pix = mockPixData;
+        
+        // Registrar no log
+        try {
+          await supabase.from('asaas_logs').insert({
+            event_type: 'PAYMENT_CREATED',
+            webhook_data: mockPayment,
+            processed: true,
+            created_at: new Date().toISOString()
+          });
+          console.log('Pagamento simulado registrado no log de webhooks.');
+        } catch (e) {
+          console.error('Erro ao registrar pagamento simulado no log:', e);
+        }
+        
+        return res.status(200).json({
+          success: true,
+          payment: mockPayment,
+          timestamp: new Date().toISOString(),
+          simulated: true
         });
-        console.log('Pagamento simulado registrado no log de webhooks.');
-      } catch (e) {
-        console.error('Erro ao registrar pagamento simulado no log:', e);
       }
       
-      return res.status(200).json({
-        success: true,
-        payment: mockPayment,
-        timestamp: new Date().toISOString(),
-        simulated: true
-      });
+      // Para outros tipos de pagamento
+      // ... existing code para outros tipos de pagamento ...
     }
     
     // Enviar requisição para o Asaas (produção)
-    const response = await axios.post(`${ASAAS_API_URL}/payments`, {
-      customer: customerId,
-      billingType,
-      value,
-      dueDate: dueDate || new Date().toISOString().split('T')[0],
-      description,
-      externalReference: userId
-    }, {
+    console.log('Enviando dados reais para o Asaas:', JSON.stringify(paymentData));
+    
+    const response = await axios.post(`${ASAAS_API_URL}/payments`, paymentData, {
       headers: {
         'Content-Type': 'application/json',
         'access_token': ASAAS_API_KEY
@@ -397,10 +429,29 @@ app.post('/api/create-payment', async (req, res) => {
     console.log('Resposta do Asaas:', response.status);
     console.log('Dados da resposta:', JSON.stringify(response.data));
     
+    // Se for PIX, buscar o QR code
+    if (billingType === 'PIX' && response.data && response.data.id) {
+      try {
+        const pixResponse = await axios.get(`${ASAAS_API_URL}/payments/${response.data.id}/pixQrCode`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': ASAAS_API_KEY
+          }
+        });
+        
+        if (pixResponse.data) {
+          response.data.pix = pixResponse.data;
+        }
+      } catch (pixError) {
+        console.error('Erro ao obter QR code PIX:', pixError.response?.data || pixError.message);
+      }
+    }
+    
     // Registrar o pagamento no Supabase
     if (response.data && response.data.id) {
       try {
-        const { error } = await supabase
+        // Registrar o log
+        const { error: logError } = await supabase
           .from('asaas_logs')
           .insert({
             event_type: 'PAYMENT_CREATED',
@@ -409,11 +460,14 @@ app.post('/api/create-payment', async (req, res) => {
             created_at: new Date().toISOString()
           });
           
-        if (error) {
-          console.error('Erro ao registrar pagamento:', error);
+        if (logError) {
+          console.error('Erro ao registrar log de pagamento:', logError);
         }
-      } catch (logError) {
-        console.error('Erro ao registrar log de pagamento:', logError);
+        
+        // Aqui você pode adicionar código para salvar o pagamento em seu banco de dados se necessário
+        
+      } catch (dbError) {
+        console.error('Erro ao registrar pagamento no banco:', dbError);
       }
     }
     
@@ -434,17 +488,16 @@ app.post('/api/create-payment', async (req, res) => {
   }
 });
 
-// Rota para criar uma assinatura no Asaas
+// Rota para criar uma assinatura
 app.post('/api/create-subscription', async (req, res) => {
   try {
-    console.log('Recebida requisição para criar assinatura:', JSON.stringify(req.body));
-    const { 
-      customerId, 
-      value, 
-      nextDueDate, 
-      description, 
+    const {
+      customerId,
+      value,
       billingType,
       cycle,
+      description,
+      nextDueDate,
       userId,
       planId
     } = req.body;
@@ -462,9 +515,33 @@ app.post('/api/create-subscription', async (req, res) => {
     console.log('Enviando requisição para o Asaas...');
     console.log('URL:', `${ASAAS_API_URL}/subscriptions`);
     
+    // Preparar dados para a API do Asaas conforme documentação
+    const subscriptionData = {
+      customer: customerId,
+      billingType: billingType, // PIX, BOLETO, CREDIT_CARD
+      value: value,
+      nextDueDate: nextDueDate || new Date().toISOString().split('T')[0],
+      cycle: cycle, // MONTHLY, YEARLY
+      description: description || 'Assinatura MedMoney',
+      ...(userId && { externalReference: userId }),
+      ...((billingType === 'PIX' || billingType === 'BOLETO') && {
+        discount: {
+          value: 0,
+          dueDateLimitDays: 0
+        },
+        interest: {
+          value: 0
+        },
+        fine: {
+          value: 0
+        }
+      })
+    };
+    
     // Em ambiente de desenvolvimento, retornar sucesso simulado
     if (process.env.NODE_ENV === 'development' || !ASAAS_API_KEY) {
       console.log('Ambiente de desenvolvimento. Retornando assinatura simulada.');
+      console.log('Dados que seriam enviados:', JSON.stringify(subscriptionData));
       
       // Definir URL de pagamento baseado no tipo de cobrança
       let invoiceUrl = null;
@@ -549,6 +626,46 @@ app.post('/api/create-subscription', async (req, res) => {
         console.error('Erro ao registrar assinatura no banco:', dbError);
       }
       
+      // Simular geração de cobrança (pagamento) para esta assinatura
+      try {
+        // Para assinaturas com PIX, já vamos criar um pagamento simulado
+        if (billingType === 'PIX') {
+          const mockPayment = {
+            id: 'pay_' + Math.floor(Math.random() * 1000000),
+            subscription: mockSubscription.id,
+            customer: customerId,
+            value: value,
+            netValue: value,
+            billingType: billingType,
+            status: 'PENDING',
+            dueDate: nextDueDate || new Date().toISOString().split('T')[0],
+            description: description || 'Assinatura MedMoney',
+            invoiceUrl: invoiceUrl,
+            externalReference: userId,
+            deleted: false,
+            postalService: false,
+            dateCreated: new Date().toISOString()
+          };
+          
+          // Adicionar dados do PIX
+          mockPayment.pix = mockSubscription.pix;
+          
+          await supabase.from('asaas_logs').insert({
+            event_type: 'PAYMENT_CREATED',
+            webhook_data: mockPayment,
+            processed: true,
+            created_at: new Date().toISOString()
+          });
+          
+          console.log('Pagamento de assinatura simulado registrado no log.');
+          
+          // Adicionar o pagamento à resposta para facilitar o acesso ao QR code
+          mockSubscription.firstPayment = mockPayment;
+        }
+      } catch (paymentError) {
+        console.error('Erro ao criar pagamento simulado para assinatura:', paymentError);
+      }
+      
       return res.status(200).json({
         success: true,
         subscription: mockSubscription,
@@ -558,15 +675,9 @@ app.post('/api/create-subscription', async (req, res) => {
     }
     
     // Enviar requisição para o Asaas (produção)
-    const response = await axios.post(`${ASAAS_API_URL}/subscriptions`, {
-      customer: customerId,
-      billingType,
-      value,
-      nextDueDate: nextDueDate || new Date().toISOString().split('T')[0],
-      description,
-      cycle, // MONTHLY, YEARLY
-      externalReference: userId
-    }, {
+    console.log('Enviando dados reais para o Asaas:', JSON.stringify(subscriptionData));
+    
+    const response = await axios.post(`${ASAAS_API_URL}/subscriptions`, subscriptionData, {
       headers: {
         'Content-Type': 'application/json',
         'access_token': ASAAS_API_KEY
@@ -575,6 +686,42 @@ app.post('/api/create-subscription', async (req, res) => {
     
     console.log('Resposta do Asaas:', response.status);
     console.log('Dados da resposta:', JSON.stringify(response.data));
+    
+    // Se o tipo de pagamento for PIX, verificar se já temos um primeiro pagamento
+    // e recuperar o QR code PIX para ele
+    if (response.data && response.data.id && billingType === 'PIX') {
+      try {
+        // Buscar os pagamentos desta assinatura
+        const paymentsResponse = await axios.get(`${ASAAS_API_URL}/subscriptions/${response.data.id}/payments`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': ASAAS_API_KEY
+          }
+        });
+        
+        if (paymentsResponse.data && paymentsResponse.data.data && paymentsResponse.data.data.length > 0) {
+          const firstPayment = paymentsResponse.data.data[0];
+          
+          // Buscar o QR code PIX do primeiro pagamento
+          const pixResponse = await axios.get(`${ASAAS_API_URL}/payments/${firstPayment.id}/pixQrCode`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'access_token': ASAAS_API_KEY
+            }
+          });
+          
+          if (pixResponse.data) {
+            // Adicionar os dados do primeiro pagamento com QR code PIX à resposta
+            response.data.firstPayment = {
+              ...firstPayment,
+              pix: pixResponse.data
+            };
+          }
+        }
+      } catch (paymentError) {
+        console.error('Erro ao buscar pagamento ou QR code PIX:', paymentError.response?.data || paymentError.message);
+      }
+    }
     
     // Registrar a assinatura no Supabase
     if (response.data && response.data.id) {
@@ -642,35 +789,61 @@ app.get('/api/subscription/:id/pix', async (req, res) => {
     
     console.log(`Buscando QR Code PIX para a assinatura ${subscriptionId}`);
     
-    // Em ambiente de desenvolvimento, retornar QR code simulado
-    if (process.env.NODE_ENV === 'development' || !ASAAS_API_KEY) {
+    // Em ambiente de produção, sempre enviar para o Asaas
+    // Em desenvolvimento, verificar se a chave existe
+    if (isProduction || ASAAS_API_KEY) {
+      console.log('Obtendo QR code PIX do Asaas...');
+      
+      try {
+        // Buscar informações da assinatura
+        const subscriptionResponse = await axios.get(`${ASAAS_API_URL}/subscriptions/${subscriptionId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': ASAAS_API_KEY
+          }
+        });
+        
+        // Se a assinatura tem um pagamento associado, buscar o QR code PIX desse pagamento
+        if (subscriptionResponse.data && subscriptionResponse.data.nextPayment) {
+          const paymentId = subscriptionResponse.data.nextPayment;
+          
+          // Buscar o QR code PIX do pagamento
+          const pixResponse = await axios.get(`${ASAAS_API_URL}/payments/${paymentId}/pixQrCode`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'access_token': ASAAS_API_KEY
+            }
+          });
+          
+          if (pixResponse.data) {
+            return res.status(200).json({
+              success: true,
+              pixQrCode: pixResponse.data,
+              subscription_id: subscriptionId,
+              payment_id: paymentId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        // Se não encontrou um pagamento ou QR code, retornar erro
+        return res.status(404).json({
+          error: 'QR Code PIX não encontrado',
+          message: 'Não foi possível encontrar um QR Code PIX para esta assinatura',
+          timestamp: new Date().toISOString()
+        });
+      } catch (asaasError) {
+        console.error('Erro ao obter QR code PIX do Asaas:', asaasError.response?.data || asaasError.message);
+        return res.status(500).json({
+          error: 'Erro ao obter QR Code PIX',
+          message: asaasError.response?.data?.errors || asaasError.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } else {
       console.log('Ambiente de desenvolvimento. Retornando QR Code PIX simulado.');
-      
-      // QR code PIX simulado (base64)
-      const mockPixData = {
-        encodedImage: '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',
-        payload: 'pix://https://sandbox.asaas.com/i/' + Math.random().toString(36).substring(2, 10),
-        expirationDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      };
-      
-      return res.status(200).json({
-        success: true,
-        pixQrCode: mockPixData,
-        subscription_id: subscriptionId,
-        timestamp: new Date().toISOString(),
-        simulated: true
-      });
+      // ... existing code para simulação ...
     }
-    
-    // Em produção, você precisaria implementar a chamada para o Asaas
-    // para obter o QR code PIX para este ID de assinatura
-    
-    return res.status(200).json({
-      success: true,
-      message: 'QR Code PIX obtido com sucesso',
-      subscription_id: subscriptionId,
-      timestamp: new Date().toISOString()
-    });
   } catch (error) {
     console.error('Erro ao obter QR Code PIX:', error);
     return res.status(500).json({
@@ -733,14 +906,14 @@ async function updatePayment(payment, status) {
     // Simplificação máxima: apenas registrar o evento como JSON
     const { data, error } = await supabase
       .from('asaas_logs')
-      .insert({
+        .insert({
         event_type: `PAYMENT_${status.toUpperCase()}`,
         webhook_data: payment,
         processed: true,
         created_at: new Date().toISOString()
-      });
-    
-    if (error) throw error;
+        });
+      
+      if (error) throw error;
     
     console.log(`Evento de pagamento ${payment.id} com status ${status} registrado com sucesso`);
     return true;
@@ -795,11 +968,11 @@ async function testSupabaseConnection() {
       process.exit(1);
     }
     
-    app.listen(PORT, () => {
-      console.log(`Servidor webhook rodando na porta ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Servidor webhook rodando na porta ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`Webhook URL: http://localhost:${PORT}/api/webhook/asaas`);
-    });
+}); 
   } catch (error) {
     console.error('Erro ao iniciar servidor:', error);
     process.exit(1);

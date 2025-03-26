@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/responsive.dart';
 import '../utils/theme.dart';
 
-class AppHeader extends StatelessWidget {
+class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
   final VoidCallback? onLoginPressed;
   final VoidCallback? onRegisterPressed;
@@ -25,6 +25,9 @@ class AppHeader extends StatelessWidget {
     this.showBackButton = false,
     this.isHomePage = false,
   }) : super(key: key);
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 16);
 
   @override
   Widget build(BuildContext context) {
