@@ -9,11 +9,14 @@ require('dotenv').config();
 const axios = require('axios');
 const cors = require('cors');
 
+// Importar o módulo de integração com n8n
+const n8nWebhook = require('./n8n_webhook');
+
 const app = express();
 const PORT = process.env.PORT || 82;
 const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rwotvxqknrjurqrhxhjv.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
@@ -29,8 +32,16 @@ console.log(`URL do Supabase: ${SUPABASE_URL}`);
 console.log(`URL do site: ${SITE_URL}`);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('Erro: Variáveis de ambiente do Supabase não configuradas!');
-  process.exit(1);
+  console.warn('Aviso: Verificando variáveis alternativas...');
+  
+  // Tentar usar SUPABASE_SERVICE_ROLE_KEY se SUPABASE_SERVICE_KEY não estiver definido
+  if (!SUPABASE_SERVICE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('Usando SUPABASE_SERVICE_ROLE_KEY como alternativa');
+    SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  } else {
+    console.error('Erro: Variáveis de ambiente do Supabase não configuradas!');
+    process.exit(1);
+  }
 }
 
 console.log('Iniciando servidor webhook com as seguintes configurações:');
@@ -853,6 +864,9 @@ app.get('/api/subscription/:id/pix', async (req, res) => {
     });
   }
 });
+
+// Adicionar rotas para integração com n8n
+n8nWebhook.addN8nRoutes(app, { supabase });
 
 // Manipuladores de eventos
 
