@@ -629,14 +629,14 @@ class PaymentProvider with ChangeNotifier {
         // Em produção ou desenvolvimento web, usar a URL de API correspondente
         if (kReleaseMode) {
           // URL de produção
-          webhookBaseUrl = 'https://medmoney.me:82';
+          webhookBaseUrl = 'https://medmoney.me';
         } else {
           // URL de desenvolvimento
           webhookBaseUrl = 'http://localhost:3000';
         }
       } else {
         // Em dispositivos móveis, usar a URL de API de produção
-        webhookBaseUrl = 'https://medmoney.me:82';
+        webhookBaseUrl = 'https://medmoney.me';
       }
       
       // Utilizamos nossa API de webhook para obter o QR code PIX
