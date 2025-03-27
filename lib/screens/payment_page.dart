@@ -85,10 +85,10 @@ class _PaymentPageState extends State<PaymentPage> {
       if (success) {
         // Dados do pagamento ou assinatura criado
         final paymentData = paymentProvider.paymentData;
-        
-        setState(() {
-          _isLoading = false;
-        });
+      
+      setState(() {
+        _isLoading = false;
+      });
       } else {
         throw Exception(paymentProvider.errorMessage ?? 'Não foi possível gerar o pagamento');
       }
@@ -114,9 +114,9 @@ class _PaymentPageState extends State<PaymentPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: Column(
+        child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+          children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
                 Text('Carregando QR code PIX...'),
@@ -175,8 +175,8 @@ class _PaymentPageState extends State<PaymentPage> {
 
         return Container(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
+              child: Column(
+                children: [
               const Text(
                 'Escaneie o QR code PIX',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -187,24 +187,24 @@ class _PaymentPageState extends State<PaymentPage> {
                 base64Decode(qrCode.replaceAll(RegExp(r'data:image/[^;]+;base64,'), '')),
                 width: 200,
                 height: 200,
-              ),
-              const SizedBox(height: 16),
+                  ),
+                  const SizedBox(height: 16),
               if (pixKey != null) ...[
                 const Text(
                   'Ou copie o código PIX:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
-                Container(
+                    Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
+                      decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
                           pixKey,
                           style: const TextStyle(fontSize: 14),
                           overflow: TextOverflow.ellipsis,
@@ -221,10 +221,10 @@ class _PaymentPageState extends State<PaymentPage> {
                             ),
                           );
                         },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
               ],
               const SizedBox(height: 24),
               const Text(
@@ -249,9 +249,9 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       body: _isLoading 
         ? const Center(
-            child: Column(
+                      child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+                        children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
                 Text('Gerando pagamento...'),
@@ -260,22 +260,22 @@ class _PaymentPageState extends State<PaymentPage> {
           )
         : _errorMessage != null
           ? Center(
-              child: Column(
+                              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+                                children: [
                   const Icon(Icons.error_outline, color: Colors.red, size: 48),
                   const SizedBox(height: 16),
                   Text(_errorMessage!),
-                  const SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
                       _initializePayment();
                     },
                     child: const Text('Tentar novamente'),
-                  ),
-                ],
-              ),
-            )
+                                  ),
+                                ],
+                              ),
+                            )
           : SingleChildScrollView(
               child: ResponsiveContainer(
                 child: Column(
@@ -284,7 +284,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     const SizedBox(height: 32),
                     const Text(
                       'Pagamento',
-                      style: TextStyle(
+                                style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
