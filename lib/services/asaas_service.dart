@@ -699,13 +699,13 @@ class AsaasService {
     }
   }
 
-  // Método para criar cliente usando nossa API de webhook
+  // Método para criar um cliente via webhook API
   Future<Map<String, dynamic>> createCustomerViaWebhook({
     required String name,
     required String email,
     required String cpfCnpj,
     String? phone,
-    required String userId,
+    String? userId,
   }) async {
     try {
       debugPrint('Criando cliente no Asaas via webhook API...');
@@ -717,16 +717,17 @@ class AsaasService {
         // Em produção ou desenvolvimento web, usar a URL de API correspondente
         if (kReleaseMode) {
           // URL de produção
-          webhookBaseUrl = 'https://medmoney.me:82';
+          webhookBaseUrl = 'https://medmoney.me';
         } else {
           // URL de desenvolvimento
           webhookBaseUrl = 'http://localhost:3000';
         }
       } else {
         // Em dispositivos móveis, usar a URL de API de produção
-        webhookBaseUrl = 'https://medmoney.me:82';
+        webhookBaseUrl = 'https://medmoney.me';
       }
       
+      // Montar URL da API de criação de cliente
       final url = Uri.parse('$webhookBaseUrl/api/create-customer');
       
       final body = jsonEncode({
@@ -798,14 +799,14 @@ class AsaasService {
         // Em produção ou desenvolvimento web, usar a URL de API correspondente
         if (kReleaseMode) {
           // URL de produção
-          webhookBaseUrl = 'https://medmoney.me:82';
+          webhookBaseUrl = 'https://medmoney.me';
         } else {
           // URL de desenvolvimento
           webhookBaseUrl = 'http://localhost:3000';
         }
       } else {
         // Em dispositivos móveis, usar a URL de API de produção
-        webhookBaseUrl = 'https://medmoney.me:82';
+        webhookBaseUrl = 'https://medmoney.me';
       }
       
       final url = Uri.parse('$webhookBaseUrl/api/create-payment');
@@ -867,14 +868,14 @@ class AsaasService {
         // Em produção ou desenvolvimento web, usar a URL de API correspondente
         if (kReleaseMode) {
           // URL de produção
-          webhookBaseUrl = 'https://medmoney.me:82';
+          webhookBaseUrl = 'https://medmoney.me';
         } else {
           // URL de desenvolvimento
           webhookBaseUrl = 'http://localhost:3000';
         }
       } else {
         // Em dispositivos móveis, usar a URL de API de produção
-        webhookBaseUrl = 'https://medmoney.me:82';
+        webhookBaseUrl = 'https://medmoney.me';
       }
       
       final url = Uri.parse('$webhookBaseUrl/api/create-subscription');

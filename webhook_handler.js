@@ -10,15 +10,14 @@ const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Configuração do Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
-// Configuração do Asaas
+const PORT = process.env.PORT || 82;
+const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rwotvxqknrjurqrhxhjv.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const SITE_URL = process.env.SITE_URL || 'https://medmoney.me';
 
 // Verificar se estamos em ambiente de produção ou desenvolvimento
 const isProduction = process.env.NODE_ENV === 'production';
@@ -27,18 +26,19 @@ const isProduction = process.env.NODE_ENV === 'production';
 console.log(`Ambiente: ${isProduction ? 'Produção' : 'Desenvolvimento'}`);
 console.log(`URL da API Asaas: ${ASAAS_API_URL}`);
 console.log(`URL do Supabase: ${SUPABASE_URL}`);
+console.log(`URL do site: ${SITE_URL}`);
 
-if (!supabaseUrl || !supabaseKey) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('Erro: Variáveis de ambiente do Supabase não configuradas!');
   process.exit(1);
 }
 
 console.log('Iniciando servidor webhook com as seguintes configurações:');
-console.log('Supabase URL:', supabaseUrl);
-console.log('Supabase Key:', '***' + supabaseKey.slice(-4));
+console.log('Supabase URL:', SUPABASE_URL);
+console.log('Supabase Key:', '***' + SUPABASE_SERVICE_KEY.slice(-4));
 console.log('Porta:', PORT);
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // Middleware para CORS
 app.use(cors({
@@ -968,11 +968,11 @@ async function testSupabaseConnection() {
       process.exit(1);
     }
     
-app.listen(PORT, () => {
-  console.log(`Servidor webhook rodando na porta ${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
-      console.log(`Webhook URL: http://localhost:${PORT}/api/webhook/asaas`);
-}); 
+    app.listen(PORT, HOSTNAME, () => {
+      console.log(`Servidor webhook rodando na porta ${PORT}`);
+      console.log(`Health check: http://${HOSTNAME}:${PORT}/health`);
+      console.log(`Webhook URL: ${SITE_URL}/api/webhook/asaas`);
+    });
   } catch (error) {
     console.error('Erro ao iniciar servidor:', error);
     process.exit(1);
