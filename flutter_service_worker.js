@@ -3,11 +3,11 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"flutter_bootstrap.js": "b8513d142b3e41f13c1fdb8c233eb2de",
+const RESOURCES = {"flutter_bootstrap.js": "03791b9a8e8d29ae94f8ccdfa692bb02",
 "version.json": "45d9f9a99477ef278175a79465a01d9c",
-"index.html": "a7b78042a485a6394bf1f17c6ffdf093",
-"/": "a7b78042a485a6394bf1f17c6ffdf093",
-"main.dart.js": "74eb951eac5278f8db76d6a69536913f",
+"index.html": "18b6d2dfe7348be4ad1730e2dc318010",
+"/": "18b6d2dfe7348be4ad1730e2dc318010",
+"main.dart.js": "00f3c6091b04380ec626d9269110bb0f",
 "medmoney_web.tar.gz": "3e211f995269d3b2499fc85b4f963186",
 "flutter.js": "76f08d47ff9f5715220992f993002504",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",

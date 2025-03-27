@@ -86773,7 +86773,7 @@ n.d=null
 n.a4()
 A.a9().$1("Obtendo QR code PIX para assinatura: "+a4)
 m=null
-m="https://medmoney.me:82"
+m="https://medmoney.me"
 l=A.dh(A.j(m)+"/api/subscription/"+a4+"/pix",0,null)
 a0=t.N
 s=7
@@ -88149,7 +88149,7 @@ var $async$Aq=A.x(function(a1,a2){if(a1===1){o.push(a2)
 s=p}while(true)switch(s){case 0:p=4
 A.a9().$1("Criando cliente no Asaas via webhook API...")
 n=null
-n="https://medmoney.me:82"
+n="https://medmoney.me"
 m=A.dh(A.j(n)+"/api/create-customer",0,null)
 h=A.c_("[^0-9]",!0,!1)
 g=t.N
@@ -88191,7 +88191,7 @@ var $async$At=A.x(function(a1,a2){if(a1===1){o.push(a2)
 s=p}while(true)switch(s){case 0:p=4
 A.a9().$1("Criando pagamento no Asaas via webhook API...")
 n=null
-n="https://medmoney.me:82"
+n="https://medmoney.me"
 m=A.dh(A.j(n)+"/api/create-payment",0,null)
 h=t.N
 l=B.X.qA(A.a_(["customerId",b,"value",a0,"billingType",a,"description",c,"dueDate",d,"userId",e],h,t.K),null)
@@ -88232,7 +88232,7 @@ s=p}while(true)switch(s){case 0:f=null
 p=4
 A.a9().$1("Criando assinatura no Asaas via webhook API...")
 n=null
-n="https://medmoney.me:82"
+n="https://medmoney.me"
 m=A.dh(A.j(n)+"/api/create-subscription",0,null)
 h=t.N
 l=B.X.qA(A.a_(["customerId",b,"value",a2,"billingType",a,"cycle",c,"description",d,"nextDueDate",a0,"userId",a1,"planId",f],h,t.X),null)
