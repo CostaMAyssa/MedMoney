@@ -27,18 +27,25 @@ sudo tar -xzvf medmoney_web.tar.gz -C /var/www/medmoney
 
 # Copiar arquivos do webhook
 echo "Configurando webhook..."
-sudo cp webhook_handler.js /var/www/webhook/
+sudo cp webhook_handler.js n8n_webhook.js setup_n8n.js /var/www/webhook/
 sudo cp package.json /var/www/webhook/
 
 # Criar arquivo .env a partir do exemplo
 echo "Criando arquivo .env..."
 sudo cp .env.example /var/www/webhook/.env
 echo "IMPORTANTE: Edite o arquivo /var/www/webhook/.env com suas credenciais!"
+echo "Especialmente defina a URL do webhook do n8n em N8N_WEBHOOK_URL"
 
 # Instalar dependências do webhook
 echo "Instalando dependências do webhook..."
 cd /var/www/webhook
 sudo npm install
+
+# Configurar tabela no Supabase para logs do n8n
+echo "Configurando tabela de logs do n8n no Supabase..."
+echo "AVISO: Esta etapa requer as credenciais do Supabase configuradas no .env"
+echo "Se ocorrer um erro, você pode executar manualmente após editar o .env:"
+echo "cd /var/www/webhook && node setup_n8n.js"
 
 # Configurar Nginx
 echo "Configurando Nginx..."
@@ -82,3 +89,4 @@ curl http://localhost:82/health
 echo "Instalação concluída!"
 echo "Agora você pode acessar o MedMoney em http://medmoney.me"
 echo "LEMBRE-SE de configurar seu DNS para apontar medmoney.me para o IP desta máquina"
+echo "E configurar a URL do webhook do n8n no arquivo /var/www/webhook/.env"
