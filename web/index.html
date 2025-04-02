@@ -22,6 +22,7 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="MedMoney">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -29,9 +30,6 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <!-- Meta tags para responsividade -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
   <!-- Preconnect para Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -120,7 +118,7 @@
         window._flutter = window._flutter || {};
         window._flutter.loader = window._flutter.loader || {};
         
-        _flutter.loader.loadEntrypoint({
+        _flutter.loader.load({
           serviceWorker: {
             serviceWorkerVersion: serviceWorkerVersion,
           },

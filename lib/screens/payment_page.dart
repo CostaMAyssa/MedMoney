@@ -690,20 +690,6 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  if (_errorMessage!.contains('n8n')) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.amber[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
                   ElevatedButton(
                     onPressed: () {
                       _initializePayment();
