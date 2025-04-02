@@ -182,16 +182,7 @@ class AsaasService {
       }
     } catch (e) {
       debugPrint('Erro ao criar cliente no Asaas: $e');
-      // Tentar usar um cliente genérico para testes
-      if (_isSandbox) {
-        debugPrint('Tentando usar cliente genérico para ambiente sandbox...');
-        return {
-          'id': 'cus_000005113838',
-          'name': 'Cliente Teste',
-          'email': 'teste@example.com',
-          'cpfCnpj': '12345678909',
-        };
-      }
+      // Não criar cliente genérico para testes, mesmo em ambiente sandbox
       throw Exception('Não foi possível criar o cliente no Asaas: $e');
     }
   }
@@ -360,15 +351,23 @@ class AsaasService {
         'ccv': creditCardCcv,
       };
       
+      // Obter cliente existente para dados do titular
+      Map<String, dynamic>? customerData;
+      try {
+        customerData = await getCustomer(customerId);
+      } catch (e) {
+        debugPrint('Erro ao obter dados do cliente: $e');
+      }
+      
       data['creditCardHolderInfo'] = {
         'name': creditCardHolderName,
-        'email': 'email@cliente.com',
-        'cpfCnpj': '00000000000',
-        'postalCode': '00000000',
-        'addressNumber': '000',
-        'addressComplement': null,
-        'phone': '0000000000',
-        'mobilePhone': '0000000000',
+        'email': customerData?['email'] ?? 'email@example.com',
+        'cpfCnpj': customerData?['cpfCnpj'] ?? '',
+        'postalCode': customerData?['postalCode'] ?? '',
+        'addressNumber': customerData?['addressNumber'] ?? '',
+        'addressComplement': customerData?['addressComplement'],
+        'phone': customerData?['phone'] ?? '',
+        'mobilePhone': customerData?['mobilePhone'] ?? customerData?['phone'] ?? '',
       };
     }
     

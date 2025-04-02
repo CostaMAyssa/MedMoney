@@ -77,35 +77,16 @@ class PaymentProvider with ChangeNotifier {
       // Criar ou obter cliente no Asaas
       Map<String, dynamic> customer;
       try {
-        // Limpar o número do cartão (remover espaços)
-        final cleanCardNumber = cardNumber.replaceAll(' ', '');
-        
-        // Validar dados do cartão
-        if (cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
-          throw Exception('Número do cartão inválido');
+        // Verificar se temos um CPF válido
+        if (userProfile['cpf_cnpj'] == null || userProfile['cpf_cnpj'].toString().isEmpty) {
+          throw Exception('CPF/CNPJ é obrigatório para criar cliente no Asaas');
         }
         
-        if (cardHolderName.isEmpty) {
-          throw Exception('Nome do titular do cartão é obrigatório');
-        }
-        
-        // Validar data de expiração
-        final expiryParts = expiryDate.split('/');
-        if (expiryParts.length != 2) {
-          throw Exception('Data de expiração inválida. Use o formato MM/AA');
-        }
-        
-        // Validar CVV
-        if (cvv.length < 3 || cvv.length > 4) {
-          throw Exception('CVV inválido');
-        }
-        
-        // Obter ou criar cliente no Asaas
         customer = await _asaasService.createCustomer(
           name: userProfile['name'] ?? 'Usuário',
           email: userProfile['email'] ?? user.email ?? 'email@exemplo.com',
-          cpfCnpj: userProfile['cpf_cnpj'] ?? '12345678909', // Usar CPF do perfil ou um valor padrão
-          phone: userProfile['phone'],
+          cpfCnpj: userProfile['cpf_cnpj'],
+          phone: userProfile['phone'] ?? '',
         );
         debugPrint('Cliente criado no Asaas: ${customer['id']}');
       } catch (e) {
@@ -240,13 +221,15 @@ class PaymentProvider with ChangeNotifier {
       // Criar ou obter cliente no Asaas
       Map<String, dynamic> customer;
       try {
-        // Garantir que temos um CPF válido (mesmo que seja fictício para teste)
-        final cpfCnpj = '12345678909'; // CPF fictício para teste
+        // Verificar se temos um CPF válido
+        if (userProfile['cpf_cnpj'] == null || userProfile['cpf_cnpj'].toString().isEmpty) {
+          throw Exception('CPF/CNPJ é obrigatório para criar cliente no Asaas');
+        }
         
         customer = await _asaasService.createCustomer(
           name: userProfile['name'] ?? 'Usuário',
           email: userProfile['email'] ?? user.email ?? 'email@exemplo.com',
-          cpfCnpj: cpfCnpj,
+          cpfCnpj: userProfile['cpf_cnpj'],
           phone: userProfile['phone'] ?? '',
         );
         
@@ -416,10 +399,15 @@ class PaymentProvider with ChangeNotifier {
       // Criar ou obter cliente no Asaas via nossa API
       Map<String, dynamic> customer;
       try {
+        // Verificar se temos CPF/CNPJ no perfil
+        if (userProfile['cpf_cnpj'] == null || userProfile['cpf_cnpj'].toString().isEmpty) {
+          throw Exception('CPF/CNPJ é obrigatório para criar cliente');
+        }
+        
         customer = await _asaasService.createCustomerViaWebhook(
           name: userProfile['name'] ?? 'Usuário',
           email: userProfile['email'] ?? user.email ?? 'email@exemplo.com',
-          cpfCnpj: userProfile['cpf_cnpj'] ?? '12345678909', // CPF fictício para teste
+          cpfCnpj: userProfile['cpf_cnpj'],
           phone: userProfile['phone'],
           userId: user.id,
         );
@@ -531,9 +519,9 @@ class PaymentProvider with ChangeNotifier {
         throw Exception('CPF é obrigatório para criar pagamento');
       }
       
-      // Telefone não é mais obrigatório, usar valor padrão se não fornecido
+      // Telefone não é mais obrigatório, usar valor vazio se não fornecido
       final String phoneValue = (phone == null || phone.isEmpty || phone == 'Telefone não informado')
-          ? '(00) 00000-0000' // Valor padrão para telefone
+          ? '' // Valor vazio para telefone, não usar valor padrão
           : phone;
       
       // Preparar dados para enviar ao n8n

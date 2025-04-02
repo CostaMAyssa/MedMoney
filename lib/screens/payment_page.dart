@@ -49,6 +49,7 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() {
     super.initState();
     _supabaseService = SupabaseService();
+    _processPayment();
   }
 
   @override
@@ -88,22 +89,21 @@ class _PaymentPageState extends State<PaymentPage> {
         throw Exception('Perfil incompleto. Por favor, complete seu cadastro.');
       }
 
-      // Obter CPF do perfil ou usar um valor padrão para teste
+      // Obter CPF do perfil ou informar que é obrigatório
       String cpf = '';
       if (userProfile['cpf'] == null || userProfile['cpf'].toString().isEmpty) {
-        debugPrint('CPF não encontrado no perfil. Usando CPF padrão para teste: 123.456.789-00');
-        // Para testes, usar um CPF padrão
-        cpf = '123.456.789-00';
+        debugPrint('CPF não encontrado no perfil.');
+        throw Exception('CPF é obrigatório para realizar o pagamento. Por favor, complete seu cadastro.');
       } else {
         cpf = userProfile['cpf'].toString();
       }
 
-      // Obter telefone do perfil ou usar valor padrão
+      // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
       String phone = '';
       if (userProfile['phone'] == null || userProfile['phone'].toString().isEmpty) {
-        debugPrint('Telefone não encontrado no perfil. Usando telefone padrão para teste: (11) 98765-4321');
-        // Para testes, usar um telefone padrão
-        phone = '(11) 98765-4321';
+        debugPrint('Telefone não encontrado no perfil. Usando valor vazio.');
+        // Não usar telefone de teste, usar string vazia
+        phone = '';
       } else {
         phone = userProfile['phone'].toString();
       }
@@ -187,6 +187,332 @@ class _PaymentPageState extends State<PaymentPage> {
           _errorMessage = 'Erro ao gerar página de pagamento: ${e.toString()}';
           _isLoading = false;
         });
+        
+        // Adicionar botão para completar o cadastro se o erro for sobre CPF ausente
+        if (e.toString().contains('CPF é obrigatório')) {
+          Future.delayed(Duration.zero, () {
+            // Mostrar um diálogo com um campo para adicionar o CPF
+            final cpfController = TextEditingController();
+            bool isLoading = false;
+            
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => StatefulBuilder(
+                builder: (context, setState) => AlertDialog(
+                  title: const Text('Adicionar CPF'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Você precisa adicionar seu CPF para continuar com o pagamento.'),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(
+                          labelText: 'CPF',
+                          hintText: '000.000.000-00',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      if (isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: CircularProgressIndicator(),
+                        ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: isLoading ? null : () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isLoading ? null : () async {
+                        // Validar CPF
+                        final cpf = cpfController.text.trim();
+                        if (cpf.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Por favor, informe seu CPF')),
+                          );
+                          return;
+                        }
+                        
+                        setState(() {
+                          isLoading = true;
+                        });
+                        
+                        try {
+                          // Atualizar o perfil com o CPF
+                          await _supabaseService.updateUserProfile({'cpf': cpf});
+                          
+                          // Fechar o diálogo
+                          Navigator.pop(context);
+                          
+                          // Recarregar a página
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('CPF adicionado com sucesso'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            
+                            // Tentar processar o pagamento novamente
+                            _processPayment();
+                          }
+                        } catch (e) {
+                          setState(() {
+                            isLoading = false;
+                          });
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao atualizar perfil: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Salvar'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          });
+        }
+      }
+    }
+  }
+
+  // Método para processar o pagamento
+  void _processPayment() async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final _supabaseService = SupabaseService();
+      final user = Supabase.instance.client.auth.currentUser;
+      
+      // Obter perfil do usuário
+      Map<String, dynamic>? userProfile;
+      try {
+        userProfile = await _supabaseService.getUserProfile();
+        debugPrint('Perfil do usuário obtido com sucesso: ${userProfile?.keys.join(', ')}');
+      } catch (e) {
+        debugPrint('Erro ao obter perfil do usuário: $e');
+      }
+
+      if (user == null) {
+        throw Exception('Usuário não autenticado. Faça login novamente.');
+      }
+
+      if (userProfile == null || userProfile['name'] == null || userProfile['name'].toString().isEmpty) {
+        throw Exception('Perfil incompleto. Por favor, complete seu cadastro.');
+      }
+
+      // Obter CPF do perfil ou informar que é obrigatório
+      String cpf = '';
+      if (userProfile['cpf'] == null || userProfile['cpf'].toString().isEmpty) {
+        debugPrint('CPF não encontrado no perfil.');
+        throw Exception('CPF é obrigatório para realizar o pagamento. Por favor, complete seu cadastro.');
+      } else {
+        cpf = userProfile['cpf'].toString();
+      }
+
+      // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
+      String phone = '';
+      if (userProfile['phone'] == null || userProfile['phone'].toString().isEmpty) {
+        debugPrint('Telefone não encontrado no perfil. Usando valor vazio.');
+        // Não usar telefone de teste, usar string vazia
+        phone = '';
+      } else {
+        phone = userProfile['phone'].toString();
+      }
+
+      // Usar o PaymentProvider para processar o pagamento via n8n
+      final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
+      
+      debugPrint('Iniciando processamento de pagamento para o plano ${widget.planName}');
+      final success = await paymentProvider.processPaymentViaN8n(
+        planName: widget.planName,
+        isAnnual: widget.planType == 'annual',
+        email: user.email ?? '',
+        userId: user.id,
+        name: userProfile['name'],
+        cpf: cpf,
+        phone: phone,
+      );
+      
+      if (!mounted) return;
+      
+      if (success) {
+        // Dados do pagamento foram processados
+        final paymentData = paymentProvider.paymentData;
+        
+        debugPrint('Pagamento processado com sucesso. Dados: $paymentData');
+        
+        // Verificar se temos a URL de pagamento (pode estar em diferentes campos)
+        String? paymentUrl;
+        
+        if (paymentData != null) {
+          // Verificar os possíveis campos que podem conter a URL
+          if (paymentData['url'] != null) {
+            paymentUrl = paymentData['url'].toString();
+          } else if (paymentData['paymentUrl'] != null) {
+            paymentUrl = paymentData['paymentUrl'].toString();
+          } else if (paymentData.containsKey('payment_url')) {
+            paymentUrl = paymentData['payment_url'].toString();
+          }
+        }
+        
+        _paymentUrl = paymentUrl;
+        
+        if (_paymentUrl != null && _paymentUrl!.isNotEmpty) {
+          debugPrint('URL de pagamento encontrada: $_paymentUrl');
+          
+          // Se estamos em ambiente web, abrir o link em nova aba imediatamente
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (mounted) {
+              // Abrir o link em uma nova aba
+              html.window.open(_paymentUrl!, '_blank');
+              
+              // Exibir mensagem de sucesso
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Link de pagamento aberto em uma nova aba'),
+                  duration: Duration(seconds: 5),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          });
+        } else {
+          debugPrint('Pagamento processado, mas sem URL de pagamento: ${paymentData?.toString()}');
+          
+          // Mostrar erro se não encontrarmos uma URL de pagamento
+          setState(() {
+            _errorMessage = 'Não foi possível gerar o link de pagamento. Entre em contato com o suporte.';
+          });
+        }
+        
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        throw Exception(paymentProvider.errorMessage ?? 'Não foi possível gerar o pagamento');
+      }
+    } catch (e) {
+      if (mounted) {
+        debugPrint('Erro ao gerar página de pagamento: $e');
+        setState(() {
+          _errorMessage = 'Erro ao gerar página de pagamento: ${e.toString()}';
+          _isLoading = false;
+        });
+        
+        // Adicionar botão para completar o cadastro se o erro for sobre CPF ausente
+        if (e.toString().contains('CPF é obrigatório')) {
+          Future.delayed(Duration.zero, () {
+            // Mostrar um diálogo com um campo para adicionar o CPF
+            final cpfController = TextEditingController();
+            bool isLoading = false;
+            
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => StatefulBuilder(
+                builder: (context, setState) => AlertDialog(
+                  title: const Text('Adicionar CPF'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Você precisa adicionar seu CPF para continuar com o pagamento.'),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(
+                          labelText: 'CPF',
+                          hintText: '000.000.000-00',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      if (isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: CircularProgressIndicator(),
+                        ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: isLoading ? null : () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isLoading ? null : () async {
+                        // Validar CPF
+                        final cpf = cpfController.text.trim();
+                        if (cpf.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Por favor, informe seu CPF')),
+                          );
+                          return;
+                        }
+                        
+                        setState(() {
+                          isLoading = true;
+                        });
+                        
+                        try {
+                          // Atualizar o perfil com o CPF
+                          await _supabaseService.updateUserProfile({'cpf': cpf});
+                          
+                          // Fechar o diálogo
+                          Navigator.pop(context);
+                          
+                          // Recarregar a página
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('CPF adicionado com sucesso'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            
+                            // Tentar processar o pagamento novamente
+                            _processPayment();
+                          }
+                        } catch (e) {
+                          setState(() {
+                            isLoading = false;
+                          });
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao atualizar perfil: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Salvar'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          });
+        }
       }
     }
   }
