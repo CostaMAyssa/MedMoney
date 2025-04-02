@@ -87444,9 +87444,9 @@ if(b1==="B\xe1sico")a=a8?199:19.9
 else a=a8?299:29.9
 l=a
 k=l+49.9
-if(a9==null||a9.length===0||a9==="Nome n\xe3o informado"){d=A.bF("Nome \xe9 obrigat\xf3rio para criar pagamento")
-throw A.d(d)}if(a6.length===0||a6==="CPF n\xe3o informado"){d=A.bF("CPF \xe9 obrigat\xf3rio para criar pagamento")
-throw A.d(d)}j=b0.length===0||b0==="Telefone n\xe3o informado"?"":b0
+if(a9==null||a9.length===0){d=A.bF("Nome \xe9 obrigat\xf3rio para criar pagamento")
+throw A.d(d)}if(a6.length===0){d=A.bF("CPF \xe9 obrigat\xf3rio para criar pagamento")
+throw A.d(d)}j=b0.length===0?"":b0
 a0=a8?"annual":"monthly"
 a1=A.bB("[^\\d]",!0,!1)
 a2=t.N
