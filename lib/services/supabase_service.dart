@@ -47,7 +47,12 @@ class SupabaseService {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
+    required String city,
+    required String state,
+    required String? cpf,
+    required String selectedPlan,
+    required bool isAnnualPlan,
   }) async {
     try {
       debugPrint('Iniciando processo de criação de conta para: $email');
@@ -59,6 +64,11 @@ class SupabaseService {
         data: {
           'name': name,
           'phone': phone,
+          'city': city,
+          'state': state,
+          'cpf': cpf,
+          'selectedPlan': selectedPlan,
+          'isAnnualPlan': isAnnualPlan,
         },
       );
       
@@ -71,13 +81,19 @@ class SupabaseService {
         
         try {
           // Tentar criar o perfil, mas não falhar se não conseguir
-          await client.from('profiles').insert({
-            'id': response.user!.id,
-            'name': name,
-            'email': email,
-            'phone': phone,
-            'created_at': DateTime.now().toIso8601String(),
-          });
+          await client
+              .from('profiles')
+              .insert({
+                'id': response.user!.id,
+                'email': email,
+                'name': name,
+                'phone': phone,
+                'city': city,
+                'state': state,
+                'cpf': cpf,
+                'created_at': DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toIso8601String(),
+              });
           
           debugPrint('Perfil criado com sucesso');
         } catch (profileError) {

@@ -75,7 +75,19 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> signUp(String name, String email, String password, {String? phone}) async {
+  Future<bool> signUp(
+    String name, 
+    String email, 
+    String password, 
+    {
+      String? phone,
+      String? city,
+      String? state,
+      String? cpf,
+      String? selectedPlan,
+      bool? isAnnualPlan
+    }
+  ) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -85,7 +97,12 @@ class AuthProvider with ChangeNotifier {
         email: email,
         password: password,
         name: name,
-        phone: phone,
+        phone: phone ?? '',
+        city: city ?? '',
+        state: state ?? '',
+        cpf: cpf,
+        selectedPlan: selectedPlan ?? 'Básico',
+        isAnnualPlan: isAnnualPlan ?? false,
       );
       
       _user = response.user;

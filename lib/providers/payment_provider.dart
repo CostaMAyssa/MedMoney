@@ -489,6 +489,170 @@ class PaymentProvider with ChangeNotifier {
     }
   }
   
+  // Processar pagamento usando n8n
+  Future<bool> processPaymentViaN8n({
+    required String userId,
+    required String email,
+    required String planName,
+    required bool isAnnual,
+    String? name,
+    String? cpf,
+    String? phone,
+  }) async {
+    _status = PaymentStatus.processing;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      debugPrint('Iniciando processamento de pagamento via n8n');
+      
+      // Definir URL do webhook n8n correta
+      String webhookUrl = 'https://n8n-n8n.cnbu8g.easypanel.host/webhook/3111eb7b-0cd3-4001-bf5f-63187043c76d';
+      
+      debugPrint('Webhook URL: $webhookUrl');
+      
+      // Calcular preços com base no plano selecionado
+      final double planPrice = planName == 'Básico' 
+          ? (isAnnual ? 199.00 : 19.90)
+          : (isAnnual ? 299.00 : 29.90);
+      
+      // Taxa de setup fixa
+      const double setupFee = 49.90;
+      
+      // Calcular preço total
+      final double totalPrice = planPrice + setupFee;
+      
+      // Validar campos obrigatórios
+      if (name == null || name.isEmpty || name == 'Nome não informado') {
+        throw Exception('Nome é obrigatório para criar pagamento');
+      }
+      
+      if (cpf == null || cpf.isEmpty || cpf == 'CPF não informado') {
+        throw Exception('CPF é obrigatório para criar pagamento');
+      }
+      
+      // Telefone não é mais obrigatório, usar valor padrão se não fornecido
+      final String phoneValue = (phone == null || phone.isEmpty || phone == 'Telefone não informado')
+          ? '(00) 00000-0000' // Valor padrão para telefone
+          : phone;
+      
+      // Preparar dados para enviar ao n8n
+      final Map<String, dynamic> paymentData = {
+        'userId': userId,
+        'email': email,
+        'planName': planName,
+        'isAnnual': isAnnual,
+        'planType': isAnnual ? 'annual' : 'monthly',
+        'planPrice': planPrice,
+        'setupFee': setupFee,
+        'totalPrice': totalPrice,
+        'name': name,
+        'cpf': cpf,
+        'phone': phoneValue,
+      };
+      
+      debugPrint('Enviando dados para n8n: $paymentData');
+      
+      // Enviar dados para o webhook n8n
+      final response = await http.post(
+        Uri.parse(webhookUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(paymentData),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Timeout ao processar pagamento via n8n');
+        },
+      );
+      
+      debugPrint('Resposta do n8n: ${response.statusCode}');
+      debugPrint('Headers da resposta: ${response.headers}');
+      
+      if (response.body.isNotEmpty) {
+        if (response.body.length > 100) {
+          debugPrint('Corpo da resposta: ${response.body.substring(0, 100)}...');
+        } else {
+          debugPrint('Corpo da resposta: ${response.body}');
+        }
+      } else {
+        debugPrint('Corpo da resposta está vazio');
+      }
+      
+      // Verificar se é um redirecionamento
+      if (response.statusCode >= 300 && response.statusCode < 400) {
+        final redirectUrl = response.headers['location'];
+        if (redirectUrl != null) {
+          debugPrint('URL de redirecionamento encontrada: $redirectUrl');
+          _paymentData = {'url': redirectUrl};
+          _status = PaymentStatus.success;
+          notifyListeners();
+          return true;
+        }
+      }
+      
+      // Se a resposta for bem-sucedida (código 200-299)
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // Mesmo que o corpo esteja vazio, vamos tentar processar a resposta
+        try {
+          Map<String, dynamic> responseData;
+          
+          // Se a resposta for vazia, exibir erro claro
+          if (response.body.trim().isEmpty) {
+            debugPrint('Resposta vazia do n8n, não é possível extrair URL de pagamento');
+            throw Exception(
+              'O servidor n8n retornou uma resposta vazia.\n\n'
+              'O n8n deve retornar um JSON com a URL de pagamento no formato:\n'
+              '{"paymentUrl": "https://url-do-pagamento"}'
+            );
+          }
+          
+          // Tentar fazer o parsing do JSON
+          responseData = jsonDecode(response.body) as Map<String, dynamic>;
+          
+          debugPrint('Dados da resposta do n8n: $responseData');
+          
+          // Verificar se temos o campo de URL de pagamento
+          if (responseData.containsKey('paymentUrl')) {
+            final paymentUrl = responseData['paymentUrl'];
+            
+            if (paymentUrl != null && paymentUrl.toString().isNotEmpty) {
+              // Salvar os dados da resposta com a URL
+              _paymentData = {'url': paymentUrl, ...responseData};
+              _status = PaymentStatus.success;
+              notifyListeners();
+              return true;
+            }
+          }
+          
+          // Se não encontramos a URL mas temos uma mensagem, ainda é um sucesso
+          if (responseData.containsKey('message')) {
+            debugPrint('Resposta recebida sem paymentUrl: ${responseData['message']}');
+            _paymentData = responseData;
+            _status = PaymentStatus.success;
+            notifyListeners();
+            return true;
+          }
+          
+          // Se chegamos aqui, a resposta foi "bem-sucedida" mas não temos dados úteis
+          throw Exception('Resposta do n8n não contém URL de pagamento ou mensagem');
+          
+        } catch (jsonError) {
+          debugPrint('Erro ao processar JSON da resposta: $jsonError');
+          throw Exception('Erro ao processar resposta do n8n: $jsonError');
+        }
+      }
+      
+      // Se chegamos aqui, houve um erro na resposta
+      throw Exception('Falha ao processar pagamento via n8n: [${response.statusCode}] ${response.body}');
+    } catch (e) {
+      debugPrint('Erro ao processar pagamento via n8n: $e');
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Erro ao processar pagamento: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+  
   // Limpar erro
   void clearError() {
     _errorMessage = null;

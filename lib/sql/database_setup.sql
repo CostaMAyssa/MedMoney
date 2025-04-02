@@ -11,14 +11,38 @@ BEGIN
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     phone TEXT,
+    cpf TEXT,
     city TEXT,
     state TEXT,
     specialty TEXT,
     bio TEXT,
     avatar_url TEXT,
+    asaas_customer_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
   );
+
+  -- Adicionar coluna CPF se ela não existir
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'cpf'
+    ) THEN
+      ALTER TABLE public.profiles ADD COLUMN cpf TEXT;
+    END IF;
+  END $$;
+
+  -- Adicionar coluna asaas_customer_id se ela não existir
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'asaas_customer_id'
+    ) THEN
+      ALTER TABLE public.profiles ADD COLUMN asaas_customer_id TEXT;
+    END IF;
+  END $$;
 
   -- Criar política de segurança para a tabela de perfis
   DROP POLICY IF EXISTS "Usuários podem ver seus próprios perfis" ON public.profiles;

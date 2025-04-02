@@ -22,6 +22,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _cpfController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -40,6 +41,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _cpfController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _passwordController.dispose();
@@ -81,16 +83,20 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       try {
-        // Registrar usuário no Supabase
         final supabaseService = SupabaseService();
         
         debugPrint('Iniciando registro com email: ${_emailController.text.trim()}');
         
         final response = await supabaseService.signUp(
           email: _emailController.text.trim(),
-          password: _passwordController.text,
+          password: _passwordController.text.trim(),
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
+          city: _cityController.text.trim(),
+          state: _stateController.text.trim(),
+          cpf: _cpfController.text.trim(),
+          selectedPlan: _selectedPlan,
+          isAnnualPlan: _isAnnualPlan,
         );
 
         debugPrint('Resposta do registro: ${response.user != null ? 'Sucesso' : 'Falha'}');
@@ -105,27 +111,15 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             );
             
-            // Calcular preço com base no plano selecionado
-            final double planPrice = _selectedPlan == 'Básico' 
-                ? (_isAnnualPlan ? 199.00 : 19.90)
-                : (_isAnnualPlan ? 299.00 : 29.90);
-            
-            // Taxa de setup fixa
-            const double setupFee = 49.90;
-            
-            // Calcular preço total
-            final double totalPrice = planPrice + setupFee;
-            
             // Navegar para a tela de pagamento após o registro
             Navigator.pushReplacementNamed(
               context, 
               '/payment',
               arguments: {
                 'planName': _selectedPlan,
-                'planType': _isAnnualPlan ? 'annual' : 'monthly',
-                'planPrice': planPrice,
-                'setupFee': setupFee,
-                'totalPrice': totalPrice,
+                'isAnnual': _isAnnualPlan,
+                'email': _emailController.text.trim(),
+                'userId': response.user!.id,
               },
             );
           }
@@ -142,15 +136,13 @@ class _RegisterPageState extends State<RegisterPage> {
         
         String errorMsg = 'Erro ao criar conta';
         
-        // Verificar tipos específicos de erro
-        if (e.toString().contains('email')) {
-          errorMsg = 'Email inválido ou já está em uso';
-        } else if (e.toString().contains('password')) {
-          errorMsg = 'Senha muito fraca. Use pelo menos 6 caracteres com letras e números';
-        } else if (e.toString().contains('network')) {
-          errorMsg = 'Erro de conexão. Verifique sua internet';
-        } else if (e.toString().contains('profiles')) {
-          errorMsg = 'Erro ao criar perfil. Verifique se o banco de dados está configurado corretamente.';
+        // Verificar se é um erro específico conhecido
+        if (e.toString().contains('User already registered')) {
+          errorMsg = 'Este email já está registrado.';
+        } else if (e.toString().contains('Password should be at least 6 characters')) {
+          errorMsg = 'A senha deve ter pelo menos 6 caracteres.';
+        } else if (e.toString().contains('Invalid email')) {
+          errorMsg = 'Email inválido. Verifique o formato.';
         }
         
         setState(() {
@@ -647,20 +639,49 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 32),
         CustomTextField(
-          label: 'Nome completo',
+          label: 'Nome completo *',
           hint: 'Seu nome completo',
           controller: _nameController,
           prefixIcon: Icons.person,
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Por favor, informe seu nome';
+              return 'Por favor, informe seu nome completo';
             }
             return null;
           },
         ),
         const SizedBox(height: 24),
         CustomTextField(
-          label: 'Celular',
+          label: 'CPF *',
+          hint: '000.000.000-00',
+          controller: _cpfController,
+          keyboardType: TextInputType.number,
+          prefixIcon: Icons.assignment_ind,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Por favor, informe seu CPF';
+            }
+            // Validação básica de CPF (formato)
+            if (!RegExp(r'^\d{3}\.\d{3}\.\d{3}\-\d{2}$').hasMatch(value) && 
+                !RegExp(r'^\d{11}$').hasMatch(value)) {
+              return 'Formato de CPF inválido. Use 000.000.000-00';
+            }
+            
+            // Formatar o CPF automaticamente
+            if (RegExp(r'^\d{11}$').hasMatch(value)) {
+              // Se for digitado sem pontuação, formatar automaticamente
+              Future.microtask(() {
+                final formattedCpf = '${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9, 11)}';
+                _cpfController.text = formattedCpf;
+              });
+            }
+            
+            return null;
+          },
+        ),
+        const SizedBox(height: 24),
+        CustomTextField(
+          label: 'Celular *',
           hint: '(00) 00000-0000',
           controller: _phoneController,
           keyboardType: TextInputType.phone,
@@ -669,6 +690,23 @@ class _RegisterPageState extends State<RegisterPage> {
             if (value == null || value.isEmpty) {
               return 'Por favor, informe seu celular';
             }
+            
+            // Validação básica de celular (formato)
+            // Aceita formatos como (XX) XXXXX-XXXX ou XX XXXXX-XXXX ou XXXXXXXXXXX
+            if (!RegExp(r'^\(\d{2}\) \d{5}\-\d{4}$').hasMatch(value) &&
+                !RegExp(r'^\d{2} \d{5}\-\d{4}$').hasMatch(value) &&
+                !RegExp(r'^\d{11}$').hasMatch(value)) {
+              return 'Formato de celular inválido. Use (00) 00000-0000';
+            }
+            
+            // Formatar o telefone automaticamente se for digitado sem pontuação
+            if (RegExp(r'^\d{11}$').hasMatch(value)) {
+              Future.microtask(() {
+                final formattedPhone = '(${value.substring(0, 2)}) ${value.substring(2, 7)}-${value.substring(7, 11)}';
+                _phoneController.text = formattedPhone;
+              });
+            }
+            
             return null;
           },
         ),
@@ -678,7 +716,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CustomTextField(
-                    label: 'Cidade',
+                    label: 'Cidade *',
                     hint: 'Sua cidade',
                     controller: _cityController,
                     prefixIcon: Icons.location_city,
@@ -691,7 +729,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(height: 24),
                   CustomTextField(
-                    label: 'Estado',
+                    label: 'Estado *',
                     hint: 'UF',
                     controller: _stateController,
                     prefixIcon: Icons.map,
@@ -710,7 +748,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   Expanded(
                     flex: 2,
                     child: CustomTextField(
-                      label: 'Cidade',
+                      label: 'Cidade *',
                       hint: 'Sua cidade',
                       controller: _cityController,
                       prefixIcon: Icons.location_city,
@@ -726,7 +764,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   Expanded(
                     flex: 1,
                     child: CustomTextField(
-                      label: 'Estado',
+                      label: 'Estado *',
                       hint: 'UF',
                       controller: _stateController,
                       prefixIcon: Icons.map,
@@ -766,7 +804,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 32),
         CustomTextField(
-          label: 'Email',
+          label: 'Email *',
           hint: 'Seu email',
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
@@ -783,7 +821,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 24),
         CustomTextField(
-          label: 'Senha',
+          label: 'Senha *',
           hint: 'Sua senha',
           controller: _passwordController,
           obscureText: _obscurePassword,
@@ -806,7 +844,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 24),
         CustomTextField(
-          label: 'Confirmar senha',
+          label: 'Confirmar senha *',
           hint: 'Confirme sua senha',
           controller: _confirmPasswordController,
           obscureText: _obscureConfirmPassword,
@@ -822,7 +860,7 @@ class _RegisterPageState extends State<RegisterPage> {
               return 'Por favor, confirme sua senha';
             }
             if (value != _passwordController.text) {
-              return 'As senhas não coincidem';
+              return 'As senhas não conferem';
             }
             return null;
           },

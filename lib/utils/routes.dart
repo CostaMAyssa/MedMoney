@@ -35,12 +35,28 @@ class AppRoutes {
     splash: (context) => const SplashScreen(),
     payment: (context) {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+      
+      // Calcular preços com base no plano selecionado
+      final planName = args['planName'] as String;
+      final isAnnual = args['isAnnual'] as bool? ?? false;
+      
+      // Calcular valores com base no plano
+      final double planPrice = planName == 'Básico' 
+          ? (isAnnual ? 199.00 : 19.90)
+          : (isAnnual ? 299.00 : 29.90);
+      
+      // Taxa de setup fixa
+      const double setupFee = 49.90;
+      
+      // Calcular preço total
+      final double totalPrice = planPrice + setupFee;
+      
       return PaymentPage(
-        planName: args['planName'],
-        planType: args['planType'],
-        planPrice: args['planPrice'],
-        setupFee: args['setupFee'],
-        totalPrice: args['totalPrice'],
+        planName: planName,
+        planType: isAnnual ? 'annual' : 'monthly',
+        planPrice: planPrice,
+        setupFee: setupFee,
+        totalPrice: totalPrice,
       );
     },
     paymentRequired: (context) => const PaymentRequiredPage(),

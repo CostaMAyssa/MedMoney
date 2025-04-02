@@ -69,31 +69,120 @@ class _PaymentPageState extends State<PaymentPage> {
         _errorMessage = null;
       });
 
-      // Usar o PaymentProvider para processar o pagamento via nossa API de webhook
+      // Obter dados do usuário atual
+      final user = Supabase.instance.client.auth.currentUser;
+      Map<String, dynamic>? userProfile;
+      
+      try {
+        userProfile = await _supabaseService.getUserProfile();
+        debugPrint('Perfil do usuário obtido com sucesso: ${userProfile?.keys.join(', ')}');
+      } catch (e) {
+        debugPrint('Erro ao obter perfil do usuário: $e');
+      }
+
+      if (user == null) {
+        throw Exception('Usuário não autenticado. Faça login novamente.');
+      }
+
+      if (userProfile == null || userProfile['name'] == null || userProfile['name'].toString().isEmpty) {
+        throw Exception('Perfil incompleto. Por favor, complete seu cadastro.');
+      }
+
+      // Obter CPF do perfil ou usar um valor padrão para teste
+      String cpf = '';
+      if (userProfile['cpf'] == null || userProfile['cpf'].toString().isEmpty) {
+        debugPrint('CPF não encontrado no perfil. Usando CPF padrão para teste: 123.456.789-00');
+        // Para testes, usar um CPF padrão
+        cpf = '123.456.789-00';
+      } else {
+        cpf = userProfile['cpf'].toString();
+      }
+
+      // Obter telefone do perfil ou usar valor padrão
+      String phone = '';
+      if (userProfile['phone'] == null || userProfile['phone'].toString().isEmpty) {
+        debugPrint('Telefone não encontrado no perfil. Usando telefone padrão para teste: (11) 98765-4321');
+        // Para testes, usar um telefone padrão
+        phone = '(11) 98765-4321';
+      } else {
+        phone = userProfile['phone'].toString();
+      }
+
+      // Usar o PaymentProvider para processar o pagamento via n8n
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
-      // Por padrão, vamos iniciar com PIX que é mais fácil e não requer dados adicionais
-      final success = await paymentProvider.processPaymentViaWebhook(
+      debugPrint('Iniciando processamento de pagamento para o plano ${widget.planName}');
+      final success = await paymentProvider.processPaymentViaN8n(
         planName: widget.planName,
-        planType: widget.planType,
-        totalPrice: widget.totalPrice,
-        billingType: 'PIX',
+        isAnnual: widget.planType == 'annual',
+        email: user.email ?? '',
+        userId: user.id,
+        name: userProfile['name'],
+        cpf: cpf,
+        phone: phone,
       );
       
       if (!mounted) return;
       
       if (success) {
-        // Dados do pagamento ou assinatura criado
+        // Dados do pagamento foram processados
         final paymentData = paymentProvider.paymentData;
-      
-      setState(() {
-        _isLoading = false;
-      });
+        
+        debugPrint('Pagamento processado com sucesso. Dados: $paymentData');
+        
+        // Verificar se temos a URL de pagamento (pode estar em diferentes campos)
+        String? paymentUrl;
+        
+        if (paymentData != null) {
+          // Verificar os possíveis campos que podem conter a URL
+          if (paymentData['url'] != null) {
+            paymentUrl = paymentData['url'].toString();
+          } else if (paymentData['paymentUrl'] != null) {
+            paymentUrl = paymentData['paymentUrl'].toString();
+          } else if (paymentData.containsKey('payment_url')) {
+            paymentUrl = paymentData['payment_url'].toString();
+          }
+        }
+        
+        _paymentUrl = paymentUrl;
+        
+        if (_paymentUrl != null && _paymentUrl!.isNotEmpty) {
+          debugPrint('URL de pagamento encontrada: $_paymentUrl');
+          
+          // Se estamos em ambiente web, abrir o link em nova aba imediatamente
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (mounted) {
+              // Abrir o link em uma nova aba
+              html.window.open(_paymentUrl!, '_blank');
+              
+              // Exibir mensagem de sucesso
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Link de pagamento aberto em uma nova aba'),
+                  duration: Duration(seconds: 5),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          });
+        } else {
+          debugPrint('Pagamento processado, mas sem URL de pagamento: ${paymentData?.toString()}');
+          
+          // Mostrar erro se não encontrarmos uma URL de pagamento
+          setState(() {
+            _errorMessage = 'Não foi possível gerar o link de pagamento. Entre em contato com o suporte.';
+          });
+        }
+        
+        setState(() {
+          _isLoading = false;
+        });
       } else {
         throw Exception(paymentProvider.errorMessage ?? 'Não foi possível gerar o pagamento');
       }
     } catch (e) {
       if (mounted) {
+        debugPrint('Erro ao gerar página de pagamento: $e');
         setState(() {
           _errorMessage = 'Erro ao gerar página de pagamento: ${e.toString()}';
           _isLoading = false;
@@ -247,6 +336,7 @@ class _PaymentPageState extends State<PaymentPage> {
       appBar: const AppHeader(
         showBackButton: true,
       ),
+      bottomNavigationBar: null,
       body: _isLoading 
         ? const Center(
                       child: Column(
@@ -260,91 +350,220 @@ class _PaymentPageState extends State<PaymentPage> {
           )
         : _errorMessage != null
           ? Center(
-                              child: Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
+                children: [
                   const Icon(Icons.error_outline, color: Colors.red, size: 48),
                   const SizedBox(height: 16),
-                  Text(_errorMessage!),
-                                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      _initializePayment();
-                    },
-                    child: const Text('Tentar novamente'),
-                                  ),
-                                ],
-                              ),
-                            )
-          : SingleChildScrollView(
-              child: ResponsiveContainer(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Pagamento',
-                                style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16),
                     ),
-                    const SizedBox(height: 16),
-                    Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Padding(
+                  ),
+                  const SizedBox(height: 24),
+                  if (_errorMessage!.contains('n8n')) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Container(
                         padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        decoration: BoxDecoration(
+                          color: Colors.amber[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber),
+                        ),
+                        child: const Column(
                           children: [
                             Text(
-                              'Plano: ${widget.planName}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              'Nota para o desenvolvedor:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             Text(
-                              'Tipo: ${widget.planType}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Valor: R\$ ${widget.planPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            if (widget.setupFee > 0) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Taxa de setup: R\$ ${widget.setupFee.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            Text(
-                              'Total: R\$ ${widget.totalPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              'O serviço n8n precisa ser configurado para retornar uma URL de pagamento no formato JSON como: {"paymentUrl": "https://..."}',
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
-                    // QR Code PIX (se disponível)
-                    _buildPixQrCode(context, paymentData),
-                    
-                    const SizedBox(height: 32),
                   ],
-                ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _initializePayment();
+                    },
+                    child: const Text('Tentar novamente'),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ResponsiveContainer(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Pagamento',
+                                    style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Plano: ${widget.planName}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tipo: ${widget.planType}',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Valor: R\$ ${widget.planPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                if (widget.setupFee > 0) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Taxa de setup: R\$ ${widget.setupFee.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Total: R\$ ${widget.totalPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Link de pagamento (se disponível)
+                        if (_paymentUrl != null) ...[
+                          Card(
+                            elevation: 2,
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Link de Pagamento',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Utilize o link abaixo para acessar sua página de pagamento:',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.payment),
+                                    label: const Text('Abrir Página de Pagamento'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryColor,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    ),
+                                    onPressed: () {
+                                      if (_paymentUrl != null) {
+                                        html.window.open(_paymentUrl!, '_blank');
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Após finalizar seu pagamento, você receberá a confirmação por email.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        // Mensagem do n8n se disponível
+                        if (paymentData != null && paymentData['message'] != null && _paymentUrl == null) ...[
+                          Card(
+                            elevation: 2,
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Status do Pagamento',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Icon(
+                                    Icons.info_outline,
+                                    size: 48,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    paymentData['message'] as String? ?? 'Processando seu pagamento...',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Em instantes você receberá um email com instruções para completar seu pagamento.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        // QR Code PIX (se disponível)
+                        _buildPixQrCode(context, paymentData),
+                        
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+                  AppFooter(),
+                ],
               ),
             ),
-      bottomNavigationBar: AppFooter(),
     );
   }
 } 
