@@ -535,7 +535,7 @@ class PaymentProvider with ChangeNotifier {
         'setupFee': setupFee,
         'totalPrice': totalPrice,
         'name': name,
-        'cpf': cpf,
+        'cpf': cpf.replaceAll(RegExp(r'[^\d]'), ''),
         'phone': phoneValue,
       };
       
@@ -544,7 +544,7 @@ class PaymentProvider with ChangeNotifier {
       debugPrint('userId: $userId');
       debugPrint('email: $email');
       debugPrint('name: $name');
-      debugPrint('cpf: $cpf (deve ser o valor real)');
+      debugPrint('cpf: ${cpf.replaceAll(RegExp(r'[^\d]'), '')} (formato limpo, apenas números)');
       debugPrint('phone: $phoneValue (vazio se não informado)');
       debugPrint('planName: $planName');
       debugPrint('planType: ${isAnnual ? 'annual' : 'monthly'}');
