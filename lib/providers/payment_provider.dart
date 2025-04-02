@@ -539,6 +539,17 @@ class PaymentProvider with ChangeNotifier {
         'phone': phoneValue,
       };
       
+      // Log detalhado para depuração
+      debugPrint('-------- DETALHES DOS DADOS ENVIADOS PARA N8N --------');
+      debugPrint('userId: $userId');
+      debugPrint('email: $email');
+      debugPrint('name: $name');
+      debugPrint('cpf: $cpf (deve ser o valor real)');
+      debugPrint('phone: $phoneValue (vazio se não informado)');
+      debugPrint('planName: $planName');
+      debugPrint('planType: ${isAnnual ? 'annual' : 'monthly'}');
+      debugPrint('-----------------------------------------------------');
+      
       debugPrint('Enviando dados para n8n: $paymentData');
       
       // Enviar dados para o webhook n8n
