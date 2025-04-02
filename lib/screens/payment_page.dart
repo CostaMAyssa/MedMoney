@@ -700,19 +700,6 @@ class _PaymentPageState extends State<PaymentPage> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.amber),
                         ),
-                        child: const Column(
-                          children: [
-                            Text(
-                              'Nota para o desenvolvedor:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'O serviço n8n precisa ser configurado para retornar uma URL de pagamento no formato JSON como: {"paymentUrl": "https://..."}',
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
