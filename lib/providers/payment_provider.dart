@@ -511,18 +511,16 @@ class PaymentProvider with ChangeNotifier {
       final double totalPrice = planPrice + setupFee;
       
       // Validar campos obrigatórios
-      if (name == null || name.isEmpty || name == 'Nome não informado') {
+      if (name == null || name.isEmpty) {
         throw Exception('Nome é obrigatório para criar pagamento');
       }
       
-      if (cpf == null || cpf.isEmpty || cpf == 'CPF não informado') {
+      if (cpf == null || cpf.isEmpty) {
         throw Exception('CPF é obrigatório para criar pagamento');
       }
       
       // Telefone não é mais obrigatório, usar valor vazio se não fornecido
-      final String phoneValue = (phone == null || phone.isEmpty || phone == 'Telefone não informado')
-          ? '' // Valor vazio para telefone, não usar valor padrão
-          : phone;
+      final String phoneValue = (phone == null || phone.isEmpty) ? '' : phone;
       
       // Preparar dados para enviar ao n8n
       final Map<String, dynamic> paymentData = {
