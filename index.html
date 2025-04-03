@@ -45,6 +45,7 @@
       margin: 0;
       padding: 0;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       font-family: 'Montserrat', sans-serif;
@@ -91,28 +92,24 @@
       100% { transform: rotate(360deg); }
     }
     
-    .footer {
+    #contato {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100%;
       background-color: rgba(10, 10, 62, 0.9);
-      padding: 15px;
+      color: white;
       text-align: center;
+      padding: 10px 0;
       font-size: 14px;
-      color: #E0E0E0;
     }
     
-    .footer p {
-      margin: 5px 0;
-    }
-    
-    .footer a {
+    #contato a {
       color: #48B7A2;
       text-decoration: none;
     }
     
-    .footer a:hover {
+    #contato a:hover {
       text-decoration: underline;
     }
   </style>
@@ -128,10 +125,8 @@
     <div class="spinner"></div>
   </div>
   
-  <div class="footer">
-    <p>Entre em contato: <a href="mailto:suportemedmoney@gmail.com">suportemedmoney@gmail.com</a></p>
-    <p>Telefone: (11) 96637-2177</p>
-    <p>São Paulo, SP</p>
+  <div id="contato">
+    <p>Email: <a href="mailto:suportemedmoney@gmail.com">suportemedmoney@gmail.com</a> | Telefone: (11) 96637-2177 | São Paulo, SP</p>
   </div>
 
   <script>
