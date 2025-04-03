@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'screens/home_page.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/auth/register_page.dart';
-import 'screens/dashboard/dashboard_page.dart';
+import 'screens/dashboard/dashboard/dashboard_page.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import 'services/supabase_service.dart';
@@ -111,7 +111,10 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark, // Usar o tema escuro por padrão
       initialRoute: AppRoutes.splash, // Iniciar com a tela de splash para verificar autenticação
-      routes: AppRoutes.routes,
+      routes: {
+        '/dashboard': (context) => const DashboardPage(),
+        ...AppRoutes.routes,
+      },
     );
   }
 }

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-// Importações condicionais para web
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import '../../services/supabase_service.dart';
+import '../../services/transaction_service.dart';
+import '../../models/transaction.dart';
 import '../../utils/theme.dart';
-import '../../utils/routes.dart';
+import 'widgets/summary_card.dart';
+import 'widgets/bar_chart_widget.dart';
+import 'widgets/pie_chart_widget.dart';
+import 'widgets/transactions_table.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -16,59 +16,29 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  bool _isLoading = true;
-  String? _errorMessage;
   bool _isCheckingSubscription = true;
   Map<String, dynamic>? _subscription;
   
-  // URL do dashboard Lovable
-  final String _dashboardUrl = 'https://medmoney-visuals.lovable.app';
-  
-  // ID único para o iframe
-  final String _iframeElementId = 'dashboard-iframe';
+  // Dados do dashboard
+  bool _isLoadingTransactions = true;
+  List<Transaction> _transactions = [];
+  double _totalIncome = 0;
+  double _totalExpense = 0;
+  double _balance = 0;
+  Map<String, dynamic> _monthlyData = {};
+  Map<String, double> _incomeCategoryData = {};
+  Map<String, double> _expenseCategoryData = {};
+
+  // Serviços
+  final SupabaseService _supabaseService = SupabaseService();
+  final TransactionService _transactionService = TransactionService();
 
   @override
   void initState() {
     super.initState();
     _checkSubscription();
-    
-    if (kIsWeb) {
-      // No Flutter Web, usamos um iframe
-      setState(() {
-        _isLoading = false;
-      });
-      
-      // Registramos o iframe após a construção do widget
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _registerIframe();
-      });
-    } else {
-      // Em dispositivos móveis, apenas definimos que não está carregando
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'O dashboard está disponível apenas na versão web.';
-      });
-    }
   }
   
-  // Registrar o iframe para uso no Flutter Web
-  void _registerIframe() {
-    // Registrar um elemento de visualização para o iframe
-    ui_web.platformViewRegistry.registerViewFactory(
-      _iframeElementId,
-      (int viewId) {
-        final iframe = html.IFrameElement()
-          ..src = _dashboardUrl
-          ..style.border = 'none'
-          ..style.height = '100%'
-          ..style.width = '100%'
-          ..allowFullscreen = true;
-        
-        return iframe;
-      },
-    );
-  }
-
   // Verificar se o usuário tem uma assinatura ativa
   Future<void> _checkSubscription() async {
     try {
@@ -76,14 +46,11 @@ class _DashboardPageState extends State<DashboardPage> {
         _isCheckingSubscription = true;
       });
       
-      final supabaseService = SupabaseService();
-      final userId = supabaseService.getCurrentUserId();
-      final subscription = userId != null 
-          ? await supabaseService.getUserSubscription(userId) 
-          : null;
+      // Não precisa armazenar userId se não for usado
+      _supabaseService.getCurrentUserId();
       
       // Usar o método que retorna Map<String, dynamic> para manter compatibilidade
-      final subscriptionMap = await supabaseService.getUserSubscriptionMap();
+      final subscriptionMap = await _supabaseService.getUserSubscriptionMap();
       
       setState(() {
         _subscription = subscriptionMap;
@@ -124,19 +91,82 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           );
           
-          // Redirecionar para a página de planos após 2 segundos
+          // Redirecionar para a página inicial após 2 segundos
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
-              Navigator.pushReplacementNamed(context, AppRoutes.home);
+              Navigator.pushReplacementNamed(context, '/');
             }
           });
         }
+      } else {
+        // Se tiver assinatura válida, carregar os dados do dashboard
+        _loadDashboardData();
       }
     } catch (e) {
       debugPrint('Erro ao verificar assinatura: $e');
       setState(() {
         _isCheckingSubscription = false;
       });
+    }
+  }
+
+  // Carregar dados do dashboard
+  Future<void> _loadDashboardData() async {
+    try {
+      setState(() {
+        _isLoadingTransactions = true;
+      });
+      
+      // Carregar transações
+      final transactions = await _transactionService.getTransactions();
+      
+      // Calcular totais
+      final totalIncome = await _transactionService.getTotalIncome();
+      final totalExpense = await _transactionService.getTotalExpense();
+      final balance = totalIncome - totalExpense;
+      
+      // Carregar dados mensais
+      final monthlyData = await _transactionService.getMonthlyData();
+      
+      // Carregar dados por categoria
+      final incomeCategoryData = await _transactionService.getCategoryData('income');
+      final expenseCategoryData = await _transactionService.getCategoryData('expense');
+      
+      setState(() {
+        _transactions = transactions;
+        _totalIncome = totalIncome;
+        _totalExpense = totalExpense;
+        _balance = balance;
+        _monthlyData = monthlyData;
+        _incomeCategoryData = incomeCategoryData;
+        _expenseCategoryData = expenseCategoryData;
+        _isLoadingTransactions = false;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar dados do dashboard: $e');
+      setState(() {
+        _isLoadingTransactions = false;
+      });
+    }
+  }
+
+  // Logout
+  Future<void> _logout() async {
+    try {
+      await _supabaseService.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } catch (e) {
+      debugPrint('Erro ao fazer logout: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao fazer logout: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
     }
   }
 
@@ -226,143 +256,181 @@ class _DashboardPageState extends State<DashboardPage> {
             )
           : !hasValidSubscription
               ? _buildNoSubscriptionView()
-              : kIsWeb
-                  ? _buildWebDashboard()
-                  : _buildMobileMessage(),
+              : _buildDashboardContent(),
     );
   }
 
-  Widget _buildWebDashboard() {
-    // Usar HtmlElementView para renderizar o iframe no Flutter Web
-    return SizedBox(
-      width: double.infinity,
-      height: double.infinity,
-      child: HtmlElementView(
-        viewType: _iframeElementId,
+  Widget _buildDashboardContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cartões de resumo
+          Row(
+            children: [
+              Expanded(
+                child: SummaryCard(
+                  title: 'Receitas',
+                  value: _totalIncome,
+                  icon: Icons.arrow_upward,
+                  color: AppTheme.incomeColor,
+                  isLoading: _isLoadingTransactions,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SummaryCard(
+                  title: 'Despesas',
+                  value: _totalExpense,
+                  icon: Icons.arrow_downward,
+                  color: AppTheme.expenseColor,
+                  isLoading: _isLoadingTransactions,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SummaryCard(
+                  title: 'Saldo',
+                  value: _balance.abs(),
+                  icon: Icons.account_balance_wallet,
+                  color: _balance >= 0 ? AppTheme.incomeColor : AppTheme.expenseColor,
+                  isLoading: _isLoadingTransactions,
+                  isNegative: _balance < 0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Gráfico de barras
+          _buildSectionTitle('Fluxo Mensal'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: BarChartWidget(
+                monthlyData: _monthlyData,
+                isLoading: _isLoadingTransactions,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Gráficos de pizza
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Receitas por Categoria'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: PieChartWidget(
+                          categoryData: _incomeCategoryData,
+                          type: 'income',
+                          isLoading: _isLoadingTransactions,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Despesas por Categoria'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: PieChartWidget(
+                          categoryData: _expenseCategoryData,
+                          type: 'expense',
+                          isLoading: _isLoadingTransactions,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Transações recentes
+          _buildSectionTitle('Transações Recentes'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TransactionsTable(
+                transactions: _transactions.take(10).toList(),
+                isLoading: _isLoadingTransactions,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMobileMessage() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.computer,
-              color: AppTheme.warningColor,
-              size: 80,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Versão Web Recomendada',
-              style: TextStyle(
-                color: AppTheme.textPrimaryColor,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Para uma melhor experiência com o dashboard, recomendamos acessar através de um navegador web em um computador.',
-              style: TextStyle(
-                color: AppTheme.textSecondaryColor,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
   Widget _buildNoSubscriptionView() {
-    // Verificar se o usuário tem alguma assinatura
-    bool hasPendingPremium = _subscription != null && 
-                            _subscription!['plan_name']?.toLowerCase() == 'premium' &&
-                            _subscription!['status'] != 'cancelled';
-    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              hasPendingPremium ? Icons.pending_actions : Icons.subscriptions_outlined,
-              color: AppTheme.warningColor,
+            const Icon(
+              Icons.lock,
               size: 80,
+              color: AppTheme.warningColor,
             ),
             const SizedBox(height: 24),
-            Text(
-              hasPendingPremium ? 'Pagamento Pendente' : 'Assinatura Premium Necessária',
+            const Text(
+              'Acesso Restrito',
               style: TextStyle(
-                color: AppTheme.textPrimaryColor,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            Text(
-              hasPendingPremium 
-                ? 'Seu pagamento do plano Premium está pendente. Após a confirmação, você terá acesso ao dashboard completo.'
-                : 'Para acessar o dashboard completo, você precisa ter uma assinatura Premium ativa.',
+            const Text(
+              'Para acessar o dashboard completo, você precisa ter uma assinatura Premium ativa.',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppTheme.textSecondaryColor,
                 fontSize: 16,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, AppRoutes.home);
+                Navigator.pushReplacementNamed(context, '/plans');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
-              child: Text(
-                hasPendingPremium ? 'Verificar Status do Pagamento' : 'Ver Planos Disponíveis',
-                style: const TextStyle(fontSize: 16),
-              ),
+              child: const Text('Ver Planos Disponíveis'),
             ),
           ],
         ),
       ),
     );
   }
-
-  Future<void> _logout() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      
-      final supabaseService = SupabaseService();
-      await supabaseService.signOut();
-      
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao fazer logout: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-} 
+}

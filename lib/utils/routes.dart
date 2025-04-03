@@ -4,7 +4,7 @@ import '../screens/splash_screen.dart';
 import '../screens/home_page.dart';
 import '../screens/auth/login_page.dart';
 import '../screens/auth/register_page.dart';
-import '../screens/dashboard/dashboard_page.dart';
+import '../screens/dashboard/dashboard/dashboard_page.dart';
 import '../screens/payment_page.dart';
 import '../screens/payment_required_page.dart';
 import '../middlewares/payment_check_middleware.dart';
