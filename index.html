@@ -14,7 +14,7 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="/">
+  <base href="/MedMoney/">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -61,7 +61,7 @@
 
     .loading img {
       width: 120px;
-      height: 120px;
+      height: auto;
       margin-bottom: 24px;
     }
 
@@ -91,45 +91,49 @@
       100% { transform: rotate(360deg); }
     }
   </style>
-
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    const serviceWorkerVersion = "1743359316";
-  </script>
+  
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 </head>
 <body>
   <div class="loading">
+    <img src="assets/images/logo.png" alt="MedMoney Logo">
     <h1>MedMoney</h1>
     <p>Plataforma de Gestão Financeira para Profissionais da Saúde</p>
     <div class="spinner"></div>
   </div>
 
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
+    window.addEventListener('load', function() {
       var loading = document.querySelector('.loading');
       
-      // Remover tela de loading imediatamente
-      if (loading) loading.style.display = 'none';
+      // Exibir mensagem de erro
+      function showError(message) {
+        console.error(message);
+        var errorElement = document.createElement('p');
+        errorElement.style.color = '#FF5252';
+        errorElement.textContent = message;
+        loading.appendChild(errorElement);
+      }
       
       try {
-        window._flutter = window._flutter || {};
-        window._flutter.loader = window._flutter.loader || {};
+        // Carregamento básico do script
+        var script = document.createElement('script');
+        script.src = 'main.dart.js';
+        script.type = 'application/javascript';
+        script.onerror = function() {
+          showError('Erro ao carregar aplicativo. Por favor, tente novamente.');
+        };
+        document.body.appendChild(script);
         
-        _flutter.loader.load({
-          serviceWorker: {
-            serviceWorkerVersion: serviceWorkerVersion,
-          },
-          onEntrypointLoaded: function(engineInitializer) {
-            engineInitializer.initializeEngine().then(function(appRunner) {
-              appRunner.runApp();
-            });
+        // Ocultar loading após um tempo
+        setTimeout(function() {
+          if (loading) {
+            loading.style.display = 'none';
           }
-        });
-      } catch (e) {
-        console.error('Erro ao inicializar Flutter:', e);
+        }, 5000);
+      } catch (error) {
+        showError('Erro ao inicializar. Por favor, recarregue a página.');
       }
     });
   </script>
