@@ -1,0 +1,22 @@
+# Configuração para o serviço MedMoney
+[http.routers.medmoney]
+  rule = "Host(`medmoney.me`) || Host(`www.medmoney.me`)"
+  service = "medmoney"
+  entryPoints = ["web", "websecure"]
+
+# Redirecionamento HTTP para HTTPS
+[http.routers.medmoney.middlewares]
+  middlewares = ["https-redirect"]
+
+# Configuração TLS com Let's Encrypt
+[http.routers.medmoney-secure]
+  rule = "Host(`medmoney.me`) || Host(`www.medmoney.me`)"
+  service = "medmoney"
+  entryPoints = ["websecure"]
+  [http.routers.medmoney-secure.tls]
+    certResolver = "default"
+
+# Definição do serviço
+[http.services.medmoney.loadBalancer]
+  [[http.services.medmoney.loadBalancer.servers]]
+    url = "http://localhost:8080" 
