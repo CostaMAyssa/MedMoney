@@ -95,7 +95,9 @@ class _PaymentPageState extends State<PaymentPage> {
         debugPrint('CPF não encontrado no perfil.');
         throw Exception('CPF é obrigatório para realizar o pagamento. Por favor, complete seu cadastro.');
       } else {
-        cpf = userProfile['cpf'].toString();
+        // Garantir que o CPF tenha apenas dígitos, removendo qualquer formatação
+        cpf = userProfile['cpf'].toString().replaceAll(RegExp(r'[^\d]'), '');
+        debugPrint('CPF obtido do perfil (apenas dígitos): $cpf');
       }
 
       // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
@@ -245,8 +247,9 @@ class _PaymentPageState extends State<PaymentPage> {
                         });
                         
                         try {
-                          // Atualizar o perfil com o CPF
-                          await _supabaseService.updateUserProfile({'cpf': cpf});
+                          // Atualizar o perfil com o CPF - Garantir que apenas números sejam salvos
+                          final cpfOnlyDigits = cpf.replaceAll(RegExp(r'[^\d]'), '');
+                          await _supabaseService.updateUserProfile({'cpf': cpfOnlyDigits});
                           
                           // Fechar o diálogo
                           Navigator.pop(context);
@@ -324,7 +327,9 @@ class _PaymentPageState extends State<PaymentPage> {
         debugPrint('CPF não encontrado no perfil.');
         throw Exception('CPF é obrigatório para realizar o pagamento. Por favor, complete seu cadastro.');
       } else {
-        cpf = userProfile['cpf'].toString();
+        // Garantir que o CPF tenha apenas dígitos, removendo qualquer formatação
+        cpf = userProfile['cpf'].toString().replaceAll(RegExp(r'[^\d]'), '');
+        debugPrint('CPF obtido do perfil (apenas dígitos): $cpf');
       }
 
       // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
@@ -474,8 +479,9 @@ class _PaymentPageState extends State<PaymentPage> {
                         });
                         
                         try {
-                          // Atualizar o perfil com o CPF
-                          await _supabaseService.updateUserProfile({'cpf': cpf});
+                          // Atualizar o perfil com o CPF - Garantir que apenas números sejam salvos
+                          final cpfOnlyDigits = cpf.replaceAll(RegExp(r'[^\d]'), '');
+                          await _supabaseService.updateUserProfile({'cpf': cpfOnlyDigits});
                           
                           // Fechar o diálogo
                           Navigator.pop(context);

@@ -519,6 +519,9 @@ class PaymentProvider with ChangeNotifier {
         throw Exception('CPF é obrigatório para criar pagamento');
       }
       
+      // Remover formatação do CPF - garantir que tenha APENAS dígitos
+      final String cpfOnlyDigits = cpf.replaceAll(RegExp(r'[^\d]'), '');
+      
       // Telefone não é mais obrigatório, usar valor vazio se não fornecido
       final String phoneValue = (phone == null || phone.isEmpty) ? '' : phone;
       
@@ -533,7 +536,7 @@ class PaymentProvider with ChangeNotifier {
         'setupFee': setupFee,
         'totalPrice': totalPrice,
         'name': name,
-        'cpf': cpf.replaceAll(RegExp(r'[^\d]'), ''),
+        'cpf': cpfOnlyDigits, // Usar o CPF sem formatação
         'phone': phoneValue,
       };
       
@@ -542,8 +545,9 @@ class PaymentProvider with ChangeNotifier {
       debugPrint('userId: $userId');
       debugPrint('email: $email');
       debugPrint('name: $name');
-      debugPrint('cpf: ${cpf.replaceAll(RegExp(r'[^\d]'), '')} (formato limpo, apenas números)');
-      debugPrint('phone: $phoneValue (vazio se não informado)');
+      debugPrint('cpf original: $cpf');
+      debugPrint('cpf limpo (enviado): $cpfOnlyDigits');
+      debugPrint('phone: $phoneValue');
       debugPrint('planName: $planName');
       debugPrint('planType: ${isAnnual ? 'annual' : 'monthly'}');
       debugPrint('-----------------------------------------------------');
