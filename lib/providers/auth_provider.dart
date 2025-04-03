@@ -93,11 +93,24 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      // Garantir que o telefone seja uma string válida ou vazia
+      final String phoneAsString = (phone != null) ? phone.toString().trim() : '';
+      debugPrint('Registrando usuário com telefone (string): $phoneAsString');
+      debugPrint('Tipo do telefone: ${phoneAsString.runtimeType}');
+      
+      // Verificar tipo original do telefone
+      if (phone != null) {
+        debugPrint('Tipo original do telefone: ${phone.runtimeType}');
+        debugPrint('Valor original do telefone: $phone');
+      } else {
+        debugPrint('Telefone é nulo, será convertido para string vazia');
+      }
+
       final response = await _supabaseService.signUp(
         email: email,
         password: password,
         name: name,
-        phone: phone ?? '',
+        phone: phoneAsString, // Explicitamente como string
         city: city ?? '',
         state: state ?? '',
         cpf: cpf,

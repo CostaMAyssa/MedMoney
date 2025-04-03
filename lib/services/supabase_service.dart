@@ -56,20 +56,36 @@ class SupabaseService {
   }) async {
     try {
       debugPrint('Iniciando processo de criação de conta para: $email');
+      debugPrint('Telefone original: $phone');
+      debugPrint('Tipo do telefone original: ${phone.runtimeType}');
+      
+      // Garantir que o telefone seja uma string válida e não nula
+      final String phoneAsString = phone.toString().trim();
+      debugPrint('Telefone após toString: $phoneAsString');
+      
+      // Criando um mapa de metadados para o usuário
+      final Map<String, dynamic> userData = {
+        'name': name,
+        'city': city,
+        'state': state,
+        'cpf': cpf,
+        'selectedPlan': selectedPlan,
+        'isAnnualPlan': isAnnualPlan,
+      };
+      
+      // Adicionar o telefone apenas se não for vazio
+      if (phoneAsString.isNotEmpty) {
+        userData['phone'] = phoneAsString;
+        debugPrint('Telefone adicionado aos metadados: $phoneAsString');
+      } else {
+        debugPrint('Telefone vazio, não será adicionado aos metadados');
+      }
       
       // Registrar o usuário no Supabase Auth
       final response = await client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'name': name,
-          'phone': phone,
-          'city': city,
-          'state': state,
-          'cpf': cpf,
-          'selectedPlan': selectedPlan,
-          'isAnnualPlan': isAnnualPlan,
-        },
+        data: userData,
       );
       
       debugPrint('Resposta do Supabase: ${response.user != null ? 'Usuário criado' : 'Falha na criação do usuário'}');
@@ -80,20 +96,34 @@ class SupabaseService {
         debugPrint('Usuário criado com sucesso: ${response.user!.id}');
         
         try {
+          // Preparar os dados do perfil
+          final Map<String, dynamic> profileData = {
+            'id': response.user!.id,
+            'email': email,
+            'name': name,
+            'city': city,
+            'state': state,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          };
+          
+          // Adicionar CPF apenas se não for nulo ou vazio
+          if (cpf != null && cpf.isNotEmpty) {
+            profileData['cpf'] = cpf;
+          }
+          
+          // Adicionar o telefone apenas se não for vazio
+          if (phoneAsString.isNotEmpty) {
+            profileData['phone'] = phoneAsString;
+            debugPrint('Telefone adicionado ao perfil: $phoneAsString');
+          } else {
+            debugPrint('Telefone vazio, não será adicionado ao perfil');
+          }
+          
           // Tentar criar o perfil, mas não falhar se não conseguir
           await client
               .from('profiles')
-              .insert({
-                'id': response.user!.id,
-                'email': email,
-                'name': name,
-                'phone': phone,
-                'city': city,
-                'state': state,
-                'cpf': cpf,
-                'created_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-              });
+              .insert(profileData);
           
           debugPrint('Perfil criado com sucesso');
         } catch (profileError) {
@@ -151,13 +181,60 @@ class SupabaseService {
         throw Exception('Usuário não autenticado');
       }
       
+      debugPrint('Buscando perfil para o usuário: $userId');
+      
       final response = await client
           .from('profiles')
           .select()
           .eq('id', userId)
           .single();
       
-      return response as Map<String, dynamic>;
+      final profileData = response as Map<String, dynamic>;
+      
+      // Log detalhado do perfil
+      debugPrint('Perfil recuperado do Supabase: $profileData');
+      
+      // Verificar telefone
+      if (profileData.containsKey('phone')) {
+        debugPrint('Telefone no perfil: ${profileData['phone']}');
+        debugPrint('Tipo do telefone no perfil: ${profileData['phone']?.runtimeType}');
+        
+        // Se o telefone for nulo mas temos o telefone nos metadados do usuário
+        if ((profileData['phone'] == null || profileData['phone'].toString().isEmpty) && 
+             client.auth.currentUser?.userMetadata?['phone'] != null) {
+          
+          final metadataPhone = client.auth.currentUser!.userMetadata!['phone'].toString();
+          debugPrint('Telefone encontrado nos metadados: $metadataPhone');
+          
+          // Atualizar o perfil com o telefone dos metadados
+          try {
+            await updateUserProfile({'phone': metadataPhone});
+            profileData['phone'] = metadataPhone;
+            debugPrint('Perfil atualizado com telefone dos metadados');
+          } catch (e) {
+            debugPrint('Erro ao atualizar perfil com telefone dos metadados: $e');
+          }
+        }
+      } else {
+        debugPrint('Campo telefone não existe no perfil');
+        
+        // Verificar se temos telefone nos metadados
+        if (client.auth.currentUser?.userMetadata?['phone'] != null) {
+          final metadataPhone = client.auth.currentUser!.userMetadata!['phone'].toString();
+          debugPrint('Telefone encontrado apenas nos metadados: $metadataPhone');
+          
+          // Tentar atualizar o perfil com o telefone
+          try {
+            await updateUserProfile({'phone': metadataPhone});
+            profileData['phone'] = metadataPhone;
+            debugPrint('Perfil atualizado com telefone dos metadados');
+          } catch (e) {
+            debugPrint('Erro ao atualizar perfil com telefone dos metadados: $e');
+          }
+        }
+      }
+      
+      return profileData;
     } catch (e) {
       debugPrint('Erro ao obter perfil: $e');
       rethrow;
@@ -912,6 +989,7 @@ class SupabaseService {
   }) async {
     try {
       debugPrint('Salvando plano escolhido: userId=$userId, planName=$planType, billingFrequency=$billingFrequency, price=$price');
+      debugPrint('Tipo do userId: ${userId.runtimeType}');
       
       // Buscar plano existente
       final existingSubscription = await getUserSubscription(userId);

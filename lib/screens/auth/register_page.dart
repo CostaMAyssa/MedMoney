@@ -86,12 +86,17 @@ class _RegisterPageState extends State<RegisterPage> {
         final supabaseService = SupabaseService();
         
         debugPrint('Iniciando registro com email: ${_emailController.text.trim()}');
+        // Garantir que o telefone é uma string
+        final String phoneAsString = _phoneController.text.trim().toString();
+        debugPrint('Telefone para registro (como string): $phoneAsString');
+        debugPrint('Tipo do telefone: ${phoneAsString.runtimeType}');
         
+        // Realizar cadastro do usuário
         final response = await supabaseService.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           name: _nameController.text.trim(),
-          phone: _phoneController.text.trim(),
+          phone: phoneAsString, // Explicitamente como string
           city: _cityController.text.trim(),
           state: _stateController.text.trim(),
           cpf: _cpfController.text.trim(),
@@ -100,54 +105,74 @@ class _RegisterPageState extends State<RegisterPage> {
         );
 
         debugPrint('Resposta do registro: ${response.user != null ? 'Sucesso' : 'Falha'}');
-
+        
         if (response.user != null) {
-          // Registro bem-sucedido
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Conta criada com sucesso! Agora complete seu pagamento.'),
-                backgroundColor: AppTheme.successColor,
-              ),
-            );
+          // Usuário criado com sucesso, agora garantimos que o perfil também seja atualizado
+          try {
+            // Verificar se o perfil foi criado corretamente
+            Map<String, dynamic>? profile;
+            try {
+              profile = await supabaseService.getUserProfile();
+              debugPrint('Perfil recuperado após cadastro: $profile');
+            } catch (e) {
+              debugPrint('Erro ao buscar perfil após cadastro: $e');
+            }
             
-            // Navegar para a tela de pagamento após o registro
-            Navigator.pushReplacementNamed(
-              context, 
-              '/payment',
-              arguments: {
-                'planName': _selectedPlan,
-                'isAnnual': _isAnnualPlan,
-                'email': _emailController.text.trim(),
-                'userId': response.user!.id,
-              },
-            );
+            // Se o perfil não tem telefone ou está vazio, tentar atualizar
+            if (profile == null || profile['phone'] == null || profile['phone'].toString().isEmpty) {
+              debugPrint('Telefone não encontrado no perfil, atualizando manualmente');
+              await supabaseService.updateUserProfile({
+                'phone': phoneAsString,
+                'name': _nameController.text.trim(),
+                'city': _cityController.text.trim(),
+                'state': _stateController.text.trim(),
+                'cpf': _cpfController.text.trim(),
+              });
+              debugPrint('Perfil atualizado manualmente com telefone: $phoneAsString');
+            }
+          } catch (profileError) {
+            // Ignorar erros na atualização do perfil
+            debugPrint('Erro ao atualizar perfil após registro (ignorado): $profileError');
           }
+          
+          // Redirecionar para a página de pagamento (ou tela inicial se for plano básico)
+          if (!mounted) return;
+
+          // Mostrar mensagem de sucesso
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Conta criada com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          Navigator.pushNamed(
+            context,
+            _selectedPlan == 'Básico' ? '/dashboard' : '/payment',
+            arguments: {
+              'planName': _selectedPlan,
+              'planType': _isAnnualPlan ? 'annual' : 'monthly',
+              'planPrice': _selectedPlan == 'Básico'
+                  ? (_isAnnualPlan ? 199.00 : 19.90)
+                  : (_isAnnualPlan ? 299.00 : 29.90),
+              'setupFee': _selectedPlan == 'Básico' ? 0.00 : 49.90,
+              'totalPrice': _selectedPlan == 'Básico'
+                  ? (_isAnnualPlan ? 199.00 : 19.90)
+                  : (_isAnnualPlan ? 348.90 : 79.80),
+            },
+          );
         } else {
-          // Erro no registro
+          // Falha no registro
           setState(() {
-            _errorMessage = 'Falha ao criar conta. Verifique se o email já está em uso.';
             _isLoading = false;
+            _errorMessage = 'Falha ao criar conta. Verifique os dados e tente novamente.';
           });
         }
       } catch (e) {
-        // Erro durante o registro
-        debugPrint('Erro detalhado no registro: $e');
-        
-        String errorMsg = 'Erro ao criar conta';
-        
-        // Verificar se é um erro específico conhecido
-        if (e.toString().contains('User already registered')) {
-          errorMsg = 'Este email já está registrado.';
-        } else if (e.toString().contains('Password should be at least 6 characters')) {
-          errorMsg = 'A senha deve ter pelo menos 6 caracteres.';
-        } else if (e.toString().contains('Invalid email')) {
-          errorMsg = 'Email inválido. Verifique o formato.';
-        }
-        
+        debugPrint('Erro no registro: $e');
         setState(() {
-          _errorMessage = errorMsg;
           _isLoading = false;
+          _errorMessage = e.toString();
         });
       }
     }
@@ -704,6 +729,9 @@ class _RegisterPageState extends State<RegisterPage> {
               Future.microtask(() {
                 final formattedPhone = '(${value.substring(0, 2)}) ${value.substring(2, 7)}-${value.substring(7, 11)}';
                 _phoneController.text = formattedPhone;
+                // Garantindo que é uma string
+                debugPrint('Telefone formatado (String): ${_phoneController.text}');
+                debugPrint('Tipo do telefone: ${_phoneController.text.runtimeType}');
               });
             }
             

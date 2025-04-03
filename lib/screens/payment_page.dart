@@ -102,18 +102,38 @@ class _PaymentPageState extends State<PaymentPage> {
 
       // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
       String phone = '';
-      if (userProfile['phone'] == null || userProfile['phone'].toString().isEmpty) {
+      if (userProfile['phone'] == null || userProfile['phone'].toString().trim().isEmpty) {
         debugPrint('Telefone não encontrado no perfil. Usando valor vazio.');
-        // Não usar telefone de teste, usar string vazia
         phone = '';
       } else {
-        phone = userProfile['phone'].toString();
+        // Garantir que o telefone seja uma string trimada
+        phone = userProfile['phone'].toString().trim();
+        debugPrint('Telefone encontrado no perfil (como string): $phone');
+        debugPrint('Tipo do telefone: ${phone.runtimeType}');
+        debugPrint('Valor original do telefone: ${userProfile['phone']}');
+        debugPrint('Tipo original do telefone: ${userProfile['phone'].runtimeType}');
       }
 
+      // Garantir que o telefone é uma string, mesmo que vazia
+      final String phoneStr = phone.toString().trim();
+      debugPrint('Telefone (como string explícita): $phoneStr');
+      debugPrint('Tipo do telefone após conversão: ${phoneStr.runtimeType}');
+      
       // Usar o PaymentProvider para processar o pagamento via n8n
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
       debugPrint('Iniciando processamento de pagamento para o plano ${widget.planName}');
+      debugPrint('-------- DETALHES DOS DADOS ENVIADOS PARA N8N --------');
+      debugPrint('userId: ${user.id}');
+      debugPrint('email: ${user.email ?? ''}');
+      debugPrint('name: ${userProfile['name']}');
+      debugPrint('cpf original: $cpf');
+      debugPrint('cpf limpo (enviado): $cpf');
+      debugPrint('phone: $phoneStr');
+      debugPrint('planName: ${widget.planName}');
+      debugPrint('planType: ${widget.planType}');
+      debugPrint('-----------------------------------------------------');
+      
       final success = await paymentProvider.processPaymentViaN8n(
         planName: widget.planName,
         isAnnual: widget.planType == 'annual',
@@ -121,7 +141,7 @@ class _PaymentPageState extends State<PaymentPage> {
         userId: user.id,
         name: userProfile['name'],
         cpf: cpf,
-        phone: phone,
+        phone: phoneStr,  // Usar a versão explicitamente convertida para string
       );
       
       if (!mounted) return;
@@ -334,18 +354,38 @@ class _PaymentPageState extends State<PaymentPage> {
 
       // Obter telefone do perfil ou usar valor vazio (não usar valores de teste)
       String phone = '';
-      if (userProfile['phone'] == null || userProfile['phone'].toString().isEmpty) {
+      if (userProfile['phone'] == null || userProfile['phone'].toString().trim().isEmpty) {
         debugPrint('Telefone não encontrado no perfil. Usando valor vazio.');
-        // Não usar telefone de teste, usar string vazia
         phone = '';
       } else {
-        phone = userProfile['phone'].toString();
+        // Garantir que o telefone seja uma string trimada
+        phone = userProfile['phone'].toString().trim();
+        debugPrint('Telefone encontrado no perfil (como string): $phone');
+        debugPrint('Tipo do telefone: ${phone.runtimeType}');
+        debugPrint('Valor original do telefone: ${userProfile['phone']}');
+        debugPrint('Tipo original do telefone: ${userProfile['phone'].runtimeType}');
       }
 
+      // Garantir que o telefone é uma string, mesmo que vazia
+      final String phoneStr = phone.toString().trim();
+      debugPrint('Telefone (como string explícita): $phoneStr');
+      debugPrint('Tipo do telefone após conversão: ${phoneStr.runtimeType}');
+      
       // Usar o PaymentProvider para processar o pagamento via n8n
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
       debugPrint('Iniciando processamento de pagamento para o plano ${widget.planName}');
+      debugPrint('-------- DETALHES DOS DADOS ENVIADOS PARA N8N --------');
+      debugPrint('userId: ${user.id}');
+      debugPrint('email: ${user.email ?? ''}');
+      debugPrint('name: ${userProfile['name']}');
+      debugPrint('cpf original: $cpf');
+      debugPrint('cpf limpo (enviado): $cpf');
+      debugPrint('phone: $phoneStr');
+      debugPrint('planName: ${widget.planName}');
+      debugPrint('planType: ${widget.planType}');
+      debugPrint('-----------------------------------------------------');
+      
       final success = await paymentProvider.processPaymentViaN8n(
         planName: widget.planName,
         isAnnual: widget.planType == 'annual',
@@ -353,7 +393,7 @@ class _PaymentPageState extends State<PaymentPage> {
         userId: user.id,
         name: userProfile['name'],
         cpf: cpf,
-        phone: phone,
+        phone: phoneStr,  // Usar a versão explicitamente convertida para string
       );
       
       if (!mounted) return;
