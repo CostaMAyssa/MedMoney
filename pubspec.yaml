@@ -61,15 +61,13 @@ flutter:
   assets:
     - .env
     - assets/images/
-    - assets/icons/
-    - assets/animations/
 
 flutter_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/images/logo.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/logo_foreground.png"
+  adaptive_icon_foreground: "assets/images/logo.png"
 
 flutter_native_splash:
   color: "#1A1A4F"
