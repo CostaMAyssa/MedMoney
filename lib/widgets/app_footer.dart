@@ -68,8 +68,8 @@ class AppFooter extends StatelessWidget {
                   context,
                   title: 'Contato',
                   children: [
-                    _buildFooterText('contato@medmoney.com.br'),
-                    _buildFooterText('(11) 99999-9999'),
+                    _buildFooterText('suportemedmoney@gmail.com'),
+                    _buildFooterText('(11) 96637-2177'),
                     _buildFooterText('São Paulo, SP'),
                   ],
                 ),
