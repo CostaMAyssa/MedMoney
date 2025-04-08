@@ -17,6 +17,16 @@ class PaymentCheckMiddleware extends StatefulWidget {
 class _PaymentCheckMiddlewareState extends State<PaymentCheckMiddleware> {
   bool _isLoading = true;
   bool _hasActiveSubscription = false;
+  
+  // Lista de rotas públicas que não precisam de verificação
+  final List<String> _publicRoutes = [
+    '/',
+    '/login',
+    '/register',
+    '/payment-required',
+    '/forgot-password',
+    '/reset-password',
+  ];
 
   @override
   void initState() {
@@ -61,8 +71,21 @@ class _PaymentCheckMiddlewareState extends State<PaymentCheckMiddleware> {
 
   @override
   Widget build(BuildContext context) {
+    // Verificar a rota atual
+    final String currentRoute = ModalRoute.of(context)?.settings.name ?? '';
+    
+    // Se estivermos na página de pagamento, não verificamos assinatura
+    if (currentRoute.startsWith('/payment')) {
+      return widget.child;
+    }
+    
+    // Permitir acesso às rotas públicas sem verificação
+    if (_publicRoutes.contains(currentRoute)) {
+      return widget.child;
+    }
+    
     if (_isLoading) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
         ),
@@ -70,7 +93,20 @@ class _PaymentCheckMiddlewareState extends State<PaymentCheckMiddleware> {
     }
     
     if (!_hasActiveSubscription) {
-      return PaymentRequiredPage();
+      // Redirecionar para a página de pagamento requerido
+      // Mas não redirecionar se já estamos na página de pagamento
+      if (!currentRoute.contains('/payment')) {
+        Future.microtask(() {
+          Navigator.pushReplacementNamed(context, '/payment-required');
+        });
+      }
+      
+      // Enquanto o redirecionamento não acontece, mostrar um indicador de carregamento
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
     
     return widget.child;

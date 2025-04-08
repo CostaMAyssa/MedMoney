@@ -49,7 +49,9 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() {
     super.initState();
     _supabaseService = SupabaseService();
-    _processPayment();
+    
+    // Não processamos mais o pagamento automaticamente
+    // Em vez disso, aguardamos a confirmação do usuário
   }
 
   @override
@@ -57,7 +59,11 @@ class _PaymentPageState extends State<PaymentPage> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      Future.microtask(() => _initializePayment());
+      // Apenas inicializamos a página, sem processar o pagamento
+      Future.microtask(() => setState(() {
+        _isLoading = false; 
+        _initialized = true;
+      }));
     }
   }
 
@@ -370,7 +376,7 @@ class _PaymentPageState extends State<PaymentPage> {
       final String phoneStr = phone.toString().trim();
       debugPrint('Telefone (como string explícita): $phoneStr');
       debugPrint('Tipo do telefone após conversão: ${phoneStr.runtimeType}');
-      
+
       // Usar o PaymentProvider para processar o pagamento via n8n
       final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context, listen: false);
       
@@ -701,214 +707,207 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final paymentProvider = provider_pkg.Provider.of<PaymentProvider>(context);
-    final paymentData = paymentProvider.paymentData;
-
     return Scaffold(
-      appBar: const AppHeader(
-        showBackButton: true,
-      ),
-      bottomNavigationBar: null,
-      body: _isLoading 
-        ? const Center(
-                      child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Gerando pagamento...'),
-              ],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Cabeçalho
+            AppHeader(
+              onLoginPressed: () {
+                Navigator.pushNamed(context, '/login');
+              },
             ),
-          )
-        : _errorMessage != null
-          ? Center(
+            
+            // Conteúdo principal
+            ResponsiveContainer(
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.isMobile(context) ? 16 : 32,
+                vertical: 64,
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
+                  Text(
+                    'Resumo da Assinatura',
+                    style: TextStyle(
+                      fontSize: Responsive.isMobile(context) ? 24 : 32,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimaryColor,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      _initializePayment();
-                    },
-                    child: const Text('Tentar novamente'),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Confirme os detalhes da sua assinatura antes de prosseguir para o pagamento',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: Responsive.isMobile(context) ? 14 : 16,
+                      color: AppTheme.textSecondaryColor,
+                    ),
                   ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ResponsiveContainer(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 32),
-                        const Text(
-                          'Pagamento',
-                                    style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  const SizedBox(height: 48),
+                  
+                  // Detalhes da assinatura
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardBackgroundColor,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                        const SizedBox(height: 16),
-                        Card(
-                          elevation: 2,
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Plano: ${widget.planName}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tipo: ${widget.planType}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Valor: R\$ ${widget.planPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                if (widget.setupFee > 0) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Taxa de setup: R\$ ${widget.setupFee.toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                ],
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Total: R\$ ${widget.totalPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Detalhes do Plano',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimaryColor,
                           ),
                         ),
                         const SizedBox(height: 24),
                         
-                        // Link de pagamento (se disponível)
-                        if (_paymentUrl != null) ...[
-                          Card(
-                            elevation: 2,
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Link de Pagamento',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Utilize o link abaixo para acessar sua página de pagamento:',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    icon: const Icon(Icons.payment),
-                                    label: const Text('Abrir Página de Pagamento'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryColor,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    ),
-                                    onPressed: () {
-                                      if (_paymentUrl != null) {
-                                        html.window.open(_paymentUrl!, '_blank');
-                                      }
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Após finalizar seu pagamento, você receberá a confirmação por email.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        // Plano selecionado
+                        _buildInfoRow(
+                          'Plano selecionado:',
+                          'Plano ${widget.planName}',
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Periodicidade
+                        _buildInfoRow(
+                          'Periodicidade:',
+                          widget.planType == 'annual' ? 'Anual' : 'Mensal',
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Valor da mensalidade
+                        _buildInfoRow(
+                          'Valor da mensalidade:',
+                          'R\$ ${widget.planPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                        ),
+                        
+                        // Taxa de ativação (se aplicável)
+                        if (widget.setupFee > 0) ...[
+                          const SizedBox(height: 12),
+                          _buildInfoRow(
+                            'Taxa de ativação:',
+                            'R\$ ${widget.setupFee.toStringAsFixed(2).replaceAll('.', ',')}',
                           ),
-                          const SizedBox(height: 24),
                         ],
                         
-                        // Mensagem do n8n se disponível
-                        if (paymentData != null && paymentData['message'] != null && _paymentUrl == null) ...[
-                          Card(
-                            elevation: 2,
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Status do Pagamento',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Icon(
-                                    Icons.info_outline,
-                                    size: 48,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    paymentData['message'] as String? ?? 'Processando seu pagamento...',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Em instantes você receberá um email com instruções para completar seu pagamento.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
+                        const Divider(height: 32),
                         
-                        // QR Code PIX (se disponível)
-                        _buildPixQrCode(context, paymentData),
-                        
-                        const SizedBox(height: 32),
+                        // Valor total
+                        _buildInfoRow(
+                          'Valor total:',
+                          'R\$ ${widget.totalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                          isBold: true,
+                        ),
                       ],
                     ),
                   ),
-                  AppFooter(),
+                  
+                  // Mensagem de erro (se houver)
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.errorColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: AppTheme.errorColor,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: AppTheme.errorColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  
+                  // Botão de ação
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: CustomButton(
+                      text: _isLoading ? 'Processando...' : 'Prosseguir para Pagamento',
+                      onPressed: processarPagamento,
+                      type: ButtonType.primary,
+                      size: ButtonSize.large,
+                      isLoading: _isLoading,
+                    ),
+                  ),
+                  
+                  // Botão para voltar
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: CustomButton(
+                      text: 'Cancelar',
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/payment-required');
+                      },
+                      type: ButtonType.outline,
+                      size: ButtonSize.medium,
+                    ),
+                  ),
                 ],
               ),
             ),
+            
+            // Rodapé
+            const AppFooter(),
+          ],
+        ),
+      ),
     );
+  }
+  
+  Widget _buildInfoRow(String label, String value, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            color: AppTheme.textSecondaryColor,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Método para processar o pagamento com VoidCallback definida
+  void processarPagamento() {
+    if (!_isLoading) {
+      _processPayment();
+    }
   }
 } 

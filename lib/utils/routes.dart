@@ -36,24 +36,16 @@ class AppRoutes {
     payment: (context) {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       
-      // Calcular preços com base no plano selecionado
+      // Obter valores diretamente dos argumentos, sem recalcular
       final planName = args['planName'] as String;
-      final isAnnual = args['isAnnual'] as bool? ?? false;
-      
-      // Calcular valores com base no plano
-      final double planPrice = planName == 'Básico' 
-          ? (isAnnual ? 199.00 : 19.90)
-          : (isAnnual ? 299.00 : 29.90);
-      
-      // Taxa de setup fixa
-      const double setupFee = 49.90;
-      
-      // Calcular preço total
-      final double totalPrice = planPrice + setupFee;
+      final planType = args['planType'] as String;
+      final planPrice = args['planPrice'] as double;
+      final setupFee = args['setupFee'] as double;
+      final totalPrice = args['totalPrice'] as double;
       
       return PaymentPage(
         planName: planName,
-        planType: isAnnual ? 'annual' : 'monthly',
+        planType: planType,
         planPrice: planPrice,
         setupFee: setupFee,
         totalPrice: totalPrice,

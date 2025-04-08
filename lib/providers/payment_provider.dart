@@ -512,15 +512,27 @@ class PaymentProvider with ChangeNotifier {
       
       // Preparar payload
       final planType = isAnnual ? 'annual' : 'monthly';
+      
+      // Definir valores consistentes
+      final double planPrice = planName == 'Básico'
+          ? (isAnnual ? 142.00 : 13.90)
+          : (isAnnual ? 228.00 : 22.90);
+          
+      // Taxa de setup fixa para todos os planos
+      final double setupFee = 49.90;
+      
+      // Cálculo total (inclui taxa de setup para todos os planos)
+      final double totalPrice = planPrice + setupFee;
+      
       final Map<String, dynamic> data = {
         'userId': userId,
         'email': email,
         'planName': planName,
         'isAnnual': isAnnual,
         'planType': planType,
-        'planPrice': isAnnual ? 299 : 29.9,  // Valores fixos para simplificar
-        'setupFee': isAnnual ? 49.9 : 0,     // Taxa de setup apenas para planos anuais
-        'totalPrice': isAnnual ? 348.9 : 29.9, // Valor total
+        'planPrice': planPrice,
+        'setupFee': setupFee,
+        'totalPrice': totalPrice,
         'name': name,
         'cpf': cleanCpf,
       };

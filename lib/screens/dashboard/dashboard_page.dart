@@ -245,37 +245,26 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildMobileMessage() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.computer,
-              color: AppTheme.warningColor,
-              size: 80,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.desktop_windows, size: 80),
+          const SizedBox(height: 24),
+          const Text(
+            'Dashboard disponível apenas na versão web',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Versão Web Recomendada',
-              style: TextStyle(
-                color: AppTheme.textPrimaryColor,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Para uma melhor experiência com o dashboard, recomendamos acessar através de um navegador web em um computador.',
-              style: TextStyle(
-                color: AppTheme.textSecondaryColor,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Por favor, acesse o MedMoney em um navegador para visualizar o dashboard completo.',
+            style: TextStyle(fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -283,8 +272,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildNoSubscriptionView() {
     // Verificar se o usuário tem alguma assinatura
     bool hasPendingPremium = _subscription != null && 
-                            _subscription!['plan_name']?.toLowerCase() == 'premium' &&
-                            _subscription!['status'] != 'cancelled';
+                           _subscription!['plan_name']?.toLowerCase() == 'premium' &&
+                           _subscription!['status'] != 'cancelled';
     
     return Center(
       child: Padding(

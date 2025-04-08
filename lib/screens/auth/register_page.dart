@@ -107,58 +107,50 @@ class _RegisterPageState extends State<RegisterPage> {
         debugPrint('Resposta do registro: ${response.user != null ? 'Sucesso' : 'Falha'}');
         
         if (response.user != null) {
-          // Usuário criado com sucesso, agora garantimos que o perfil também seja atualizado
-          try {
-            // Verificar se o perfil foi criado corretamente
-            Map<String, dynamic>? profile;
-            try {
-              profile = await supabaseService.getUserProfile();
-              debugPrint('Perfil recuperado após cadastro: $profile');
-            } catch (e) {
-              debugPrint('Erro ao buscar perfil após cadastro: $e');
-            }
-            
-            // Se o perfil não tem telefone ou está vazio, tentar atualizar
-            if (profile == null || profile['phone'] == null || profile['phone'].toString().isEmpty) {
-              debugPrint('Telefone não encontrado no perfil, atualizando manualmente');
-              await supabaseService.updateUserProfile({
-                'phone': phoneAsString,
-                'name': _nameController.text.trim(),
-                'city': _cityController.text.trim(),
-                'state': _stateController.text.trim(),
-                'cpf': _cpfController.text.trim(),
-              });
-              debugPrint('Perfil atualizado manualmente com telefone: $phoneAsString');
-            }
-          } catch (profileError) {
-            // Ignorar erros na atualização do perfil
-            debugPrint('Erro ao atualizar perfil após registro (ignorado): $profileError');
-          }
+          // Registro realizado com sucesso
+          setState(() {
+            _isLoading = false;
+          });
           
-          // Redirecionar para a página de pagamento (ou tela inicial se for plano básico)
-          if (!mounted) return;
-
           // Mostrar mensagem de sucesso
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Conta criada com sucesso!'),
+            SnackBar(
+              content: Text(
+                'Conta criada com sucesso! Redirecionando...',
+                style: TextStyle(color: Colors.white),
+              ),
               backgroundColor: Colors.green,
             ),
           );
-
-          Navigator.pushNamed(
+          
+          // Sempre redirecionar para a página de pagamento após o registro
+          // independentemente do plano selecionado
+          debugPrint('Redirecionando para a página de pagamento após registro');
+          
+          // Taxa de setup para todos os planos
+          final double setupFee = 49.90;
+          
+          // Cálculo do preço total (inclui taxa de setup para todos os planos, anuais e mensais)
+          final double totalPrice;
+          if (_selectedPlan == 'Básico') {
+            totalPrice = _isAnnualPlan ? 142.00 + setupFee : 13.90 + setupFee;
+          } else {
+            totalPrice = _isAnnualPlan ? 228.00 + setupFee : 22.90 + setupFee;
+          }
+          
+          debugPrint('Plano: $_selectedPlan, Tipo: ${_isAnnualPlan ? 'Anual' : 'Mensal'}, Taxa: $setupFee, Total: $totalPrice');
+          
+          Navigator.pushReplacementNamed(
             context,
-            _selectedPlan == 'Básico' ? '/dashboard' : '/payment',
+            '/payment',
             arguments: {
               'planName': _selectedPlan,
               'planType': _isAnnualPlan ? 'annual' : 'monthly',
               'planPrice': _selectedPlan == 'Básico'
-                  ? (_isAnnualPlan ? 199.00 : 19.90)
-                  : (_isAnnualPlan ? 299.00 : 29.90),
-              'setupFee': _selectedPlan == 'Básico' ? 0.00 : 49.90,
-              'totalPrice': _selectedPlan == 'Básico'
-                  ? (_isAnnualPlan ? 199.00 : 19.90)
-                  : (_isAnnualPlan ? 348.90 : 79.80),
+                  ? (_isAnnualPlan ? 142.00 : 13.90)
+                  : (_isAnnualPlan ? 228.00 : 22.90),
+              'setupFee': setupFee,
+              'totalPrice': totalPrice,
             },
           );
         } else {
@@ -529,7 +521,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _buildSimplePlanOption(
           'Plano Básico',
           'Bot no WhatsApp',
-          _isAnnualPlan ? 'R\$ 199,00/ano' : 'R\$ 19,90/mês',
+          _isAnnualPlan ? 'R\$ 142,00/ano' : 'R\$ 13,90/mês',
           _selectedPlan == 'Básico',
           () {
             setState(() {
@@ -541,7 +533,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _buildSimplePlanOption(
           'Plano Premium',
           'Bot + Dashboard',
-          _isAnnualPlan ? 'R\$ 299,00/ano' : 'R\$ 29,90/mês',
+          _isAnnualPlan ? 'R\$ 228,00/ano' : 'R\$ 22,90/mês',
           _selectedPlan == 'Premium',
           () {
             setState(() {
