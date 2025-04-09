@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../screens/splash_screen.dart';
 import '../screens/home_page.dart';
 import '../screens/auth/login_page.dart';
 import '../screens/auth/register_page.dart';
-import '../screens/dashboard/dashboard_page.dart';
 import '../screens/payment_page.dart';
 import '../screens/payment_required_page.dart';
+import '../screens/splash_screen.dart';
+import '../screens/dashboard/dashboard_page.dart';
 import '../middlewares/payment_check_middleware.dart';
 import '../screens/subscription_status_page.dart';
+import '../screens/terms_of_use_page.dart';
 
 class AppRoutes {
-  // Definição das rotas
+  // Definição de rotas
   static const String home = '/';
   static const String login = '/login';
   static const String register = '/register';
@@ -19,19 +20,21 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String payment = '/payment';
   static const String paymentRequired = '/payment-required';
-  static const String paymentSuccess = '/payment_success';
-  static const String paymentFailure = '/payment_failure';
+  static const String paymentSuccess = '/payment-success';
+  static const String paymentFailure = '/payment-error';
   static const String subscriptionStatus = '/subscription_status';
   static const String profile = '/profile';
+  static const String termsOfUse = '/terms-of-use';
 
   // Mapa de rotas
   static final Map<String, WidgetBuilder> routes = {
     home: (context) => const HomePage(),
     login: (context) => const LoginPage(),
-    register: (context) => const RegisterPage(),
-    dashboard: (context) => const PaymentCheckMiddleware(
-      child: DashboardPage(),
-    ),
+    register: (context) {
+      final Map<String, dynamic>? args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      return RegisterPage(initialData: args);
+    },
+    dashboard: (context) => const DashboardPage(),
     splash: (context) => const SplashScreen(),
     payment: (context) {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
@@ -59,5 +62,6 @@ class AppRoutes {
         child: Text('Página de perfil em desenvolvimento', style: TextStyle(fontSize: 18)),
       ),
     ),
+    termsOfUse: (context) => const TermsOfUsePage(),
   };
 } 

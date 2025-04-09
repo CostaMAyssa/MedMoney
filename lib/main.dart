@@ -21,6 +21,7 @@ import 'providers/transaction_provider.dart';
 import 'providers/shift_provider.dart';
 import 'providers/appointment_provider.dart';
 import 'providers/payment_provider.dart';
+import 'screens/terms_of_use_page.dart';
 // import 'api/webhook_handler.dart'; // Webhook será configurado posteriormente
 
 void main() async {
@@ -111,7 +112,10 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark, // Usar o tema escuro por padrão
       initialRoute: AppRoutes.splash, // Iniciar com a tela de splash para verificar autenticação
-      routes: AppRoutes.routes,
+      routes: {
+        ...AppRoutes.routes,
+        '/terms-of-use': (context) => const TermsOfUsePage(),
+      },
     );
   }
 }

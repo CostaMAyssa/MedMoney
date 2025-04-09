@@ -7,6 +7,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/responsive_container.dart';
 import '../../services/supabase_service.dart';
+import '../../services/pdf_service.dart';
 
 class RegisterPage extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -186,6 +187,11 @@ class _RegisterPageState extends State<RegisterPage> {
         _currentStep -= 1;
       });
     }
+  }
+
+  Future<void> _openTermsOfUse() async {
+    // Navegar para a página de termos de uso
+    Navigator.pushNamed(context, '/terms-of-use');
   }
 
   @override
@@ -887,6 +893,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 24),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(
               value: true,
@@ -894,12 +901,29 @@ class _RegisterPageState extends State<RegisterPage> {
               activeColor: AppTheme.primaryColor,
             ),
             Expanded(
-              child: Text(
-                'Concordo com os Termos de Uso e Política de Privacidade',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textSecondaryColor,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Concordo com os Termos de Uso e Política de Privacidade',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: _openTermsOfUse,
+                    child: Text(
+                      'Ler termos de uso',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.primaryColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
