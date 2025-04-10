@@ -102,7 +102,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       subscriptionMap['payment_status'] == 'paid';
         
         // Verificar se é um plano premium (que dá acesso ao dashboard)
-        bool isPremium = subscriptionMap['plan_name']?.toLowerCase() == 'premium';
+        bool isPremium = subscriptionMap['plan_name']?.toLowerCase().contains('premium') ?? false;
         
         // Acesso permitido apenas se todas as condições forem atendidas
         hasValidSubscription = isActive && isPaid && isPremium;
@@ -149,7 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
       bool isActive = _subscription!['status'] == 'active';
       bool isPaid = _subscription!['payment_status'] == 'confirmed' || 
                     _subscription!['payment_status'] == 'paid';
-      bool isPremium = _subscription!['plan_name']?.toLowerCase() == 'premium';
+      bool isPremium = _subscription!['plan_name']?.toLowerCase().contains('premium') ?? false;
       
       hasValidSubscription = isActive && isPaid && isPremium;
     }
@@ -272,7 +272,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildNoSubscriptionView() {
     // Verificar se o usuário tem alguma assinatura
     bool hasPendingPremium = _subscription != null && 
-                           _subscription!['plan_name']?.toLowerCase() == 'premium' &&
+                           _subscription!['plan_name']?.toLowerCase().contains('premium') == true &&
                            _subscription!['status'] != 'cancelled';
     
     return Center(

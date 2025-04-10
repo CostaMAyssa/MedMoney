@@ -1040,8 +1040,8 @@ class SupabaseService {
       
       // Verificar o tipo de plano
       String planName = (subscriptionMap['plan_name'] ?? '').toLowerCase();
-      bool isPremium = planName == 'premium';
-      bool isEssential = planName == 'essencial' || planName == 'basic';
+      bool isPremium = planName.contains('premium');
+      bool isEssential = planName.contains('essencial') || planName.contains('basic');
       
       if (!isActive || !isPaid) {
         return 'pending_payment';
