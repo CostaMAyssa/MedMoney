@@ -50,6 +50,15 @@ class _PaymentPageState extends State<PaymentPage> {
     super.initState();
     _supabaseService = SupabaseService();
     
+    // Log detalhado dos valores recebidos na página de pagamento
+    debugPrint('====== VALORES RECEBIDOS NA PÁGINA DE PAGAMENTO ======');
+    debugPrint('Plano: ${widget.planName}');
+    debugPrint('Tipo: ${widget.planType}');
+    debugPrint('Preço do plano: ${widget.planPrice}');
+    debugPrint('Taxa de setup: ${widget.setupFee}');
+    debugPrint('Preço total: ${widget.totalPrice}');
+    debugPrint('=====================================================');
+    
     // Não processamos mais o pagamento automaticamente
     // Em vez disso, aguardamos a confirmação do usuário
   }
@@ -138,6 +147,8 @@ class _PaymentPageState extends State<PaymentPage> {
       debugPrint('phone: $phoneStr');
       debugPrint('planName: ${widget.planName}');
       debugPrint('planType: ${widget.planType}');
+      debugPrint('planPrice (valor bruto): ${widget.planPrice}');
+      debugPrint('isAnnual: ${widget.planType == 'annual'}');
       debugPrint('-----------------------------------------------------');
       
       final success = await paymentProvider.processPaymentViaN8n(
@@ -390,6 +401,8 @@ class _PaymentPageState extends State<PaymentPage> {
       debugPrint('phone: $phoneStr');
       debugPrint('planName: ${widget.planName}');
       debugPrint('planType: ${widget.planType}');
+      debugPrint('planPrice (valor bruto): ${widget.planPrice}');
+      debugPrint('isAnnual: ${widget.planType == 'annual'}');
       debugPrint('-----------------------------------------------------');
       
       final success = await paymentProvider.processPaymentViaN8n(

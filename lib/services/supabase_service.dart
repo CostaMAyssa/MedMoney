@@ -675,23 +675,23 @@ class SupabaseService {
     try {
       await client.from('plans').insert([
         {
-          'name': 'Basic',
-          'price': 29.90,
-          'price_annual': 299.90,
+          'name': 'Essencial',
+          'price': 15.90,
+          'price_annual': 163.00,
           'setup_fee': 0,
           'features': [
-            'Acesso ao dashboard básico',
+            'Acesso ao bot no WhatsApp',
             'Controle de despesas',
             'Alertas financeiros',
           ],
           'is_active': true,
-          'type': 'basic',
+          'type': 'essencial',
         },
         {
           'name': 'Premium',
-          'price': 59.90,
-          'price_annual': 599.90,
-          'setup_fee': 19.90,
+          'price': 24.90,
+          'price_annual': 254.00,
+          'setup_fee': 0,
           'features': [
             'Acesso ao dashboard completo',
             'Controle de despesas e receitas',
@@ -701,22 +701,6 @@ class SupabaseService {
           ],
           'is_active': true,
           'type': 'premium',
-        },
-        {
-          'name': 'Enterprise',
-          'price': 99.90,
-          'price_annual': 999.90,
-          'setup_fee': 0,
-          'features': [
-            'Acesso a todos os recursos',
-            'Suporte prioritário',
-            'Relatórios avançados',
-            'Integração com outros sistemas',
-            'Consultoria financeira completa',
-            'Acesso multi-usuário',
-          ],
-          'is_active': true,
-          'type': 'enterprise',
         },
       ]);
       
@@ -1035,6 +1019,46 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Erro ao salvar plano escolhido: $e');
       rethrow;
+    }
+  }
+
+  // Verificar o tipo de acesso do usuário com base na assinatura
+  Future<String> checkUserAccessType() async {
+    try {
+      final subscriptionMap = await getUserSubscriptionMap();
+      
+      if (subscriptionMap == null) {
+        return 'no_subscription';
+      }
+      
+      // Verificar se a assinatura está ativa
+      bool isActive = subscriptionMap['status'] == 'active';
+      
+      // Verificar se o pagamento foi confirmado
+      bool isPaid = subscriptionMap['payment_status'] == 'confirmed' || 
+                    subscriptionMap['payment_status'] == 'paid';
+      
+      // Verificar o tipo de plano
+      String planName = (subscriptionMap['plan_name'] ?? '').toLowerCase();
+      bool isPremium = planName == 'premium';
+      bool isEssential = planName == 'essencial' || planName == 'basic';
+      
+      if (!isActive || !isPaid) {
+        return 'pending_payment';
+      }
+      
+      if (isPremium) {
+        return 'premium';
+      }
+      
+      if (isEssential) {
+        return 'essential';
+      }
+      
+      return 'unknown';
+    } catch (e) {
+      debugPrint('Erro ao verificar tipo de acesso: $e');
+      return 'error';
     }
   }
 } 

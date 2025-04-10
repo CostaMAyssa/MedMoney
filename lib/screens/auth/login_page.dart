@@ -63,53 +63,42 @@ class _LoginPageState extends State<LoginPage> {
             // Verificar se o usuário tem uma assinatura ativa
             try {
               final userId = supabaseService.getCurrentUserId();
-              final subscription = userId != null 
-                  ? await supabaseService.getUserSubscription(userId) 
-                  : null;
+              final accessType = await supabaseService.checkUserAccessType();
               
-              if (subscription != null && subscription.status == 'active') {
-                // Usuário tem assinatura ativa, navegar para o dashboard
-                Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-              } else {
-                // Usuário não tem assinatura ativa, navegar para a tela de pagamento
-                Navigator.pushReplacementNamed(
-                  context, 
-                  AppRoutes.payment,
-                  arguments: {
-                    'planName': 'Básico',
-                    'planType': 'monthly',
-                    'planPrice': 19.90,
-                    'setupFee': 49.90,
-                    'totalPrice': 69.80,
-                  },
-                );
+              debugPrint('Tipo de acesso do usuário: $accessType');
+              
+              switch (accessType) {
+                case 'premium':
+                  // Usuário Premium com assinatura ativa vai para o dashboard
+                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+                  break;
+                  
+                case 'essential':
+                  // Usuário Essencial vai para o dashboard (pode ver upgrade para Premium lá)
+                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+                  break;
+                  
+                case 'pending_payment':
+                  // Usuário com pagamento pendente também vai para o dashboard
+                  // Ele pode verificar status da assinatura lá
+                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+                  break;
+                  
+                case 'no_subscription':
+                case 'unknown':
+                case 'error':
+                default:
+                  // Todos os casos vão para o dashboard
+                  // A verificação de assinatura acontecerá no dashboard
+                  Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+                  break;
               }
             } catch (e) {
-              debugPrint('Erro ao verificar assinatura: $e');
-              
-              // Verificar se o erro é devido à tabela inexistente
-              if (e.toString().contains('relation') && e.toString().contains('does not exist')) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('É necessário configurar o banco de dados. Verifique o arquivo SUPABASE_SETUP.md para instruções.'),
-                    backgroundColor: AppTheme.warningColor,
-                    duration: Duration(seconds: 5),
-                  ),
-                );
+              debugPrint('Erro ao verificar assinatura durante login: $e');
+              // Se ocorrer um erro, envia para o dashboard também
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
               }
-              
-              // Em caso de erro, direcionar para a tela de pagamento por segurança
-              Navigator.pushReplacementNamed(
-                context, 
-                AppRoutes.payment,
-                arguments: {
-                  'planName': 'Básico',
-                  'planType': 'monthly',
-                  'planPrice': 19.90,
-                  'setupFee': 49.90,
-                  'totalPrice': 69.80,
-                },
-              );
             }
           }
         } else {

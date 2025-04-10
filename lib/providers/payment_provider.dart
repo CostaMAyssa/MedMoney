@@ -494,6 +494,16 @@ class PaymentProvider with ChangeNotifier {
     required String phone,
   }) async {
     try {
+      // Log detalhado de todos os parâmetros recebidos
+      debugPrint('==== INICIANDO PROCESSAMENTO DE PAGAMENTO VIA N8N ====');
+      debugPrint('Plano: $planName');
+      debugPrint('Tipo: ${isAnnual ? "Anual" : "Mensal"}');
+      debugPrint('Email: $email');
+      debugPrint('UserId: $userId');
+      debugPrint('Nome: $name');
+      debugPrint('CPF: $cpf');
+      debugPrint('Telefone: $phone');
+      
       _isLoading = true;
       _errorMessage = null;
       _paymentData = null;
@@ -513,16 +523,25 @@ class PaymentProvider with ChangeNotifier {
       // Preparar payload
       final planType = isAnnual ? 'annual' : 'monthly';
       
-      // Definir valores consistentes
-      final double planPrice = planName == 'Básico'
-          ? (isAnnual ? 142.00 : 13.90)
-          : (isAnnual ? 228.00 : 22.90);
+      // Definir valores precisos para o plano
+      double planPrice;
+      if (planName == 'Essencial') {
+        planPrice = isAnnual ? 163.00 : 15.90;
+      } else if (planName == 'Premium') {
+        planPrice = isAnnual ? 254.00 : 24.90;
+      } else {
+        // Valor padrão se algum outro nome de plano for passado
+        planPrice = isAnnual ? 163.00 : 15.90;
+      }
           
-      // Taxa de setup fixa para todos os planos
-      final double setupFee = 49.90;
+      // Taxa de setup (agora é zero)
+      final double setupFee = 0.0;
       
-      // Cálculo total (inclui taxa de setup para todos os planos)
-      final double totalPrice = planPrice + setupFee;
+      // Cálculo total (sem taxa de setup)
+      final double totalPrice = planPrice;
+      
+      // Mostrar log detalhado para debugging
+      debugPrint('Processando pagamento para plano: $planName, tipo: ${isAnnual ? "Anual" : "Mensal"}, preço: $planPrice');
       
       final Map<String, dynamic> data = {
         'userId': userId,
@@ -563,10 +582,28 @@ class PaymentProvider with ChangeNotifier {
         // Tentar decodificar a resposta
         try {
           final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+          debugPrint('==== RESPOSTA DO N8N DECODIFICADA ====');
           debugPrint('Dados da resposta do n8n: $responseData');
           
           // Salvar os dados de pagamento
           _paymentData = responseData;
+          
+          // Verificar se temos uma URL de pagamento
+          String? paymentUrl;
+          if (_paymentData!.containsKey('paymentUrl')) {
+            paymentUrl = _paymentData!['paymentUrl'];
+            debugPrint('URL de pagamento encontrada: $paymentUrl');
+          } else if (_paymentData!.containsKey('url')) {
+            paymentUrl = _paymentData!['url'];
+            debugPrint('URL de pagamento encontrada (campo url): $paymentUrl');
+          } else if (_paymentData!.containsKey('payment_url')) {
+            paymentUrl = _paymentData!['payment_url'];
+            debugPrint('URL de pagamento encontrada (campo payment_url): $paymentUrl');
+          }
+          
+          // Log final
+          debugPrint('==== FIM DO PROCESSAMENTO DE PAGAMENTO ====');
+          debugPrint('Sucesso: ${paymentUrl != null ? "Sim" : "Não"}');
           
           // Verificar se temos uma URL de pagamento ou outra resposta válida
           if (_paymentData!.containsKey('paymentUrl') || 

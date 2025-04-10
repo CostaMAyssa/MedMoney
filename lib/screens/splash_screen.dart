@@ -32,27 +32,36 @@ class _SplashScreenState extends State<SplashScreen> {
       debugPrint('Verificando autenticação: ${currentUser != null ? 'Usuário autenticado' : 'Usuário não autenticado'}');
       
       if (currentUser != null) {
-        // Usuário autenticado, verificar se tem assinatura ativa
+        // Usuário autenticado, verificar tipo de acesso
         try {
           final supabaseService = SupabaseService();
-          final subscriptionMap = await supabaseService.getUserSubscriptionMap();
+          final accessType = await supabaseService.checkUserAccessType();
           
-          if (subscriptionMap != null && subscriptionMap['status'] == 'active') {
-            // Usuário tem assinatura ativa, navegar para o dashboard
-            Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-          } else {
-            // Usuário não tem assinatura ativa, navegar para a tela de pagamento
-            Navigator.pushReplacementNamed(
-              context, 
-              AppRoutes.payment,
-              arguments: {
-                'planName': 'Básico',
-                'planType': 'monthly',
-                'planPrice': 19.90,
-                'setupFee': 49.90,
-                'totalPrice': 69.80,
-              },
-            );
+          debugPrint('Tipo de acesso do usuário: $accessType');
+          
+          switch (accessType) {
+            case 'premium':
+              // Usuário Premium com assinatura ativa vai para o dashboard
+              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              break;
+              
+            case 'essential':
+              // Usuário Essencial vai para o dashboard também
+              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              break;
+              
+            case 'pending_payment':
+              // Pagamento pendente também vai para o dashboard
+              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              break;
+              
+            case 'no_subscription':
+            case 'unknown':
+            case 'error':
+            default:
+              // Todos os casos vão para o dashboard
+              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              break;
           }
         } catch (e) {
           debugPrint('Erro ao verificar assinatura: $e');
@@ -75,11 +84,11 @@ class _SplashScreenState extends State<SplashScreen> {
             context, 
             AppRoutes.payment,
             arguments: {
-              'planName': 'Básico',
+              'planName': 'Essencial',
               'planType': 'monthly',
-              'planPrice': 19.90,
-              'setupFee': 49.90,
-              'totalPrice': 69.80,
+              'planPrice': 15.90,
+              'setupFee': 0.0,
+              'totalPrice': 15.90,
             },
           );
         }

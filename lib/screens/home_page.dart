@@ -507,71 +507,28 @@ class _HomePageState extends State<HomePage> {
           
           return Column(
             children: [
+              const SizedBox(height: 64),
+              
+              // Título da seção de planos
               Text(
-                'Planos e Preços',
-                textAlign: TextAlign.center,
+                'Escolha o Plano Ideal Para Você',
                 style: TextStyle(
-                  fontSize: Responsive.isMobile(context) ? 24 : 32,
+                  fontSize: 40,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimaryColor,
+                  color: Colors.white,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
-                'Escolha o plano ideal para suas necessidades',
-                textAlign: TextAlign.center,
+                'Gerencie suas finanças com o MedMoney',
                 style: TextStyle(
-                  fontSize: Responsive.isMobile(context) ? 16 : 18,
+                  fontSize: 20,
                   color: AppTheme.textSecondaryColor,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              
-              // Informação sobre o setup inicial
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppTheme.primaryColor,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Setup Inicial: R\$ 49,90',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Pago uma única vez para personalização individual da plataforma',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textSecondaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 64),
               
               // Seletor de plano anual ou mensal
               Container(
@@ -612,24 +569,26 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         _buildSimplePlanCard(
                           context,
-                          'Plano Básico',
+                          'Plano Essencial',
                           'Bot no WhatsApp',
-                          isAnnualNotifier.value ? 'R\$ 142,00/ano' : 'R\$ 13,90/mês',
-                          selectedPlanNotifier.value == 'Básico',
-                          () => selectPlan('Básico'),
+                          isAnnualNotifier.value ? 'R\$ 163,00/ano' : 'R\$ 15,90/mês',
+                          selectedPlanNotifier.value == 'Essencial',
+                          () => selectPlan('Essencial'),
                           () => navigateToRegister(),
-                          isAnnualNotifier.value ? 'Economia de 15% em relação ao pagamento mensal' : 'R\$ 167,00/ano se pago mensalmente',
+                          isAnnualNotifier.value ? 'Economia de 14,57% em relação ao pagamento mensal' : 'R\$ 190,80/ano se pago mensalmente',
+                          isRecommended: false,
                         ),
                         const SizedBox(height: 24),
                         _buildSimplePlanCard(
                           context,
                           'Plano Premium',
                           'Bot no WhatsApp + Dashboard',
-                          isAnnualNotifier.value ? 'R\$ 228,00/ano' : 'R\$ 22,90/mês',
+                          isAnnualNotifier.value ? 'R\$ 254,00/ano' : 'R\$ 24,90/mês',
                           selectedPlanNotifier.value == 'Premium',
                           () => selectPlan('Premium'),
                           () => navigateToRegister(),
-                          isAnnualNotifier.value ? 'Economia de 17% em relação ao pagamento mensal' : 'R\$ 275,00/ano se pago mensalmente',
+                          isAnnualNotifier.value ? 'Economia de 15% em relação ao pagamento mensal' : 'R\$ 298,80/ano se pago mensalmente',
+                          isRecommended: true,
                         ),
                       ],
                     )
@@ -639,13 +598,14 @@ class _HomePageState extends State<HomePage> {
                         Expanded(
                           child: _buildSimplePlanCard(
                             context,
-                            'Plano Básico',
+                            'Plano Essencial',
                             'Bot no WhatsApp',
-                            isAnnualNotifier.value ? 'R\$ 142,00/ano' : 'R\$ 13,90/mês',
-                            selectedPlanNotifier.value == 'Básico',
-                            () => selectPlan('Básico'),
+                            isAnnualNotifier.value ? 'R\$ 163,00/ano' : 'R\$ 15,90/mês',
+                            selectedPlanNotifier.value == 'Essencial',
+                            () => selectPlan('Essencial'),
                             () => navigateToRegister(),
-                            isAnnualNotifier.value ? 'Economia de 15% em relação ao pagamento mensal' : 'R\$ 167,00/ano se pago mensalmente',
+                            isAnnualNotifier.value ? 'Economia de 14,57% em relação ao pagamento mensal' : 'R\$ 190,80/ano se pago mensalmente',
+                            isRecommended: false,
                           ),
                         ),
                         const SizedBox(width: 24),
@@ -654,11 +614,12 @@ class _HomePageState extends State<HomePage> {
                             context,
                             'Plano Premium',
                             'Bot no WhatsApp + Dashboard',
-                            isAnnualNotifier.value ? 'R\$ 228,00/ano' : 'R\$ 22,90/mês',
+                            isAnnualNotifier.value ? 'R\$ 254,00/ano' : 'R\$ 24,90/mês',
                             selectedPlanNotifier.value == 'Premium',
                             () => selectPlan('Premium'),
                             () => navigateToRegister(),
-                            isAnnualNotifier.value ? 'Economia de 17% em relação ao pagamento mensal' : 'R\$ 275,00/ano se pago mensalmente',
+                            isAnnualNotifier.value ? 'Economia de 15% em relação ao pagamento mensal' : 'R\$ 298,80/ano se pago mensalmente',
+                            isRecommended: true,
                           ),
                         ),
                       ],
@@ -700,6 +661,7 @@ class _HomePageState extends State<HomePage> {
     VoidCallback onCardTap,
     VoidCallback onButtonTap,
     String additionalInfo,
+    {bool isRecommended = false}
   ) {
     return Container(
       decoration: BoxDecoration(
@@ -725,7 +687,7 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (isSelected)
+              if (isRecommended)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),

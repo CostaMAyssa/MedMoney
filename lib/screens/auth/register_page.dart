@@ -9,6 +9,14 @@ import '../../widgets/responsive_container.dart';
 import '../../services/supabase_service.dart';
 import '../../services/pdf_service.dart';
 
+// Definição da classe Plan no nível superior
+class Plan {
+  final String name;
+  final String price;
+
+  Plan({required this.name, required this.price});
+}
+
 class RegisterPage extends StatefulWidget {
   final Map<String, dynamic>? initialData;
   
@@ -33,9 +41,11 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   int _currentStep = 0;
-  String _selectedPlan = 'Básico'; // Plano padrão selecionado
+  String _selectedPlan = 'Essencial'; // Plano padrão selecionado
   bool _isAnnualPlan = false; // Controla se o plano é anual ou mensal
   String? _errorMessage;
+  bool plansLoaded = false;
+  List<Plan> _plans = [];
 
   @override
   void dispose() {
@@ -54,6 +64,19 @@ class _RegisterPageState extends State<RegisterPage> {
   void initState() {
     super.initState();
     
+    // Inicializar os planos
+    _plans = [
+      Plan(
+        name: 'Essencial',
+        price: _isAnnualPlan ? 'R\$ 163,00' : 'R\$ 15,90',
+      ),
+      Plan(
+        name: 'Premium',
+        price: _isAnnualPlan ? 'R\$ 254,00' : 'R\$ 24,90',
+      ),
+    ];
+    plansLoaded = true;
+    
     // Definir plano selecionado com base nos argumentos recebidos
     if (widget.initialData != null) {
       final selectedPlan = widget.initialData!['selectedPlan'];
@@ -68,12 +91,29 @@ class _RegisterPageState extends State<RegisterPage> {
       if (isAnnual != null) {
         setState(() {
           _isAnnualPlan = isAnnual;
+          // Atualizar os preços de acordo com a periodicidade
+          _updatePlanPrices();
         });
       }
       
-      // Avançar para a etapa de informações pessoais
-      _currentStep = 1;
+      // Mantendo o usuário na etapa de escolha de plano (etapa 0)
+      // para que ele possa confirmar ou modificar sua escolha
+      _currentStep = 0;
     }
+  }
+  
+  // Método para atualizar os preços conforme o tipo de plano selecionado
+  void _updatePlanPrices() {
+    _plans = [
+      Plan(
+        name: 'Essencial',
+        price: _isAnnualPlan ? 'R\$ 163,00' : 'R\$ 15,90',
+      ),
+      Plan(
+        name: 'Premium',
+        price: _isAnnualPlan ? 'R\$ 254,00' : 'R\$ 24,90',
+      ),
+    ];
   }
 
   Future<void> _register() async {
@@ -128,18 +168,33 @@ class _RegisterPageState extends State<RegisterPage> {
           // independentemente do plano selecionado
           debugPrint('Redirecionando para a página de pagamento após registro');
           
-          // Taxa de setup para todos os planos
-          final double setupFee = 49.90;
+          // Obter o plano selecionado do array de planos
+          Plan selectedPlan = _plans.firstWhere(
+            (plan) => plan.name == _selectedPlan,
+            orElse: () => Plan(
+              name: _selectedPlan,
+              price: _isAnnualPlan ? 'R\$ 163,00' : 'R\$ 15,90',
+            ),
+          );
           
-          // Cálculo do preço total (inclui taxa de setup para todos os planos, anuais e mensais)
-          final double totalPrice;
-          if (_selectedPlan == 'Básico') {
-            totalPrice = _isAnnualPlan ? 142.00 + setupFee : 13.90 + setupFee;
-          } else {
-            totalPrice = _isAnnualPlan ? 228.00 + setupFee : 22.90 + setupFee;
-          }
+          // Remover símbolos e converter para double
+          final String planPriceStr = selectedPlan.price;
+          final double planPrice = double.tryParse(
+              planPriceStr.replaceAll('R\$', '').replaceAll(',', '.').trim()) ?? 0.0;
           
-          debugPrint('Plano: $_selectedPlan, Tipo: ${_isAnnualPlan ? 'Anual' : 'Mensal'}, Taxa: $setupFee, Total: $totalPrice');
+          // Taxa de setup é zero
+          final double setupFee = 0.0;
+          
+          // Log detalhado para debugging
+          debugPrint('====== DETALHES DO PLANO SELECIONADO ======');
+          debugPrint('Nome do plano: $_selectedPlan');
+          debugPrint('Tipo: ${_isAnnualPlan ? "Anual" : "Mensal"}');
+          debugPrint('Preço exibido: ${selectedPlan.price}');
+          debugPrint('Preço convertido: $planPrice');
+          debugPrint('Taxa de setup: $setupFee');
+          debugPrint('==========================================');
+          
+          debugPrint('Plano: $_selectedPlan, Tipo: ${_isAnnualPlan ? 'Anual' : 'Mensal'}, Preço: $planPrice, Taxa: $setupFee');
           
           Navigator.pushReplacementNamed(
             context,
@@ -147,11 +202,9 @@ class _RegisterPageState extends State<RegisterPage> {
             arguments: {
               'planName': _selectedPlan,
               'planType': _isAnnualPlan ? 'annual' : 'monthly',
-              'planPrice': _selectedPlan == 'Básico'
-                  ? (_isAnnualPlan ? 142.00 : 13.90)
-                  : (_isAnnualPlan ? 228.00 : 22.90),
+              'planPrice': planPrice,
               'setupFee': setupFee,
-              'totalPrice': totalPrice,
+              'totalPrice': planPrice,
             },
           );
         } else {
@@ -163,9 +216,39 @@ class _RegisterPageState extends State<RegisterPage> {
         }
       } catch (e) {
         debugPrint('Erro no registro: $e');
+        
+        // Tratar erros específicos
+        String errorMsg = 'Erro ao criar conta';
+        String errorText = e.toString().toLowerCase();
+        
+        if (errorText.contains('user_already_exists') || 
+            errorText.contains('already registered') || 
+            errorText.contains('already registered') || 
+            errorText.contains('statuscode: 422') ||
+            errorText.contains('user_already_exists') ||
+            (errorText.contains('authexception') && errorText.contains('registered')) ||
+            errorText.contains('email já está cadastrado')) {
+          errorMsg = 'Este email já está cadastrado. Por favor, utilize outro email ou faça login.';
+        } else if (errorText.contains('invalid email')) {
+          errorMsg = 'Email inválido. Por favor, verifique o formato do email informado.';
+        } else if (errorText.contains('network')) {
+          errorMsg = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        } else if (errorText.contains('password')) {
+          errorMsg = 'Senha inválida. A senha deve ter pelo menos 6 caracteres.';
+        } else if (errorText.contains('statuscode: 422')) {
+          errorMsg = 'Usuário já registrado. Por favor, faça login com sua conta existente.';
+        } else if (errorText.contains('supabase')) {
+          // Erro específico do Supabase
+          if (errorText.contains('auth')) {
+            errorMsg = 'Erro de autenticação. Por favor, verifique suas credenciais.';
+          } else {
+            errorMsg = 'Erro no serviço. Por favor, tente novamente mais tarde.';
+          }
+        }
+        
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
+          _errorMessage = errorMsg;
         });
       }
     }
@@ -259,6 +342,65 @@ class _RegisterPageState extends State<RegisterPage> {
         padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 32),
         child: Column(
           children: [
+            // Mensagem de erro para usuário já registrado (se houver)
+            if (_errorMessage != null && _errorMessage!.contains('email já está cadastrado')) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.errorColor, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: AppTheme.errorColor,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Usuário já registrado',
+                            style: TextStyle(
+                              color: AppTheme.errorColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: AppTheme.errorColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                            child: Text(
+                              'Clique aqui para fazer login',
+                              style: TextStyle(
+                                color: AppTheme.primaryColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
             // Indicador de progresso
             Responsive.isMobile(context)
               ? Column(
@@ -297,8 +439,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   ],
                 ),
             
-            // Mensagem de erro (se houver)
-            if (_errorMessage != null) ...[
+            // Mensagem de erro (para outros erros)
+            if (_errorMessage != null && !_errorMessage!.contains('email já está cadastrado')) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -458,24 +600,16 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Escolha seu plano',
-          style: TextStyle(
-            fontSize: Responsive.isMobile(context) ? 18 : 20,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimaryColor,
-          ),
-        ),
         const SizedBox(height: 16),
-        Text(
-          'Selecione o plano que melhor atende às suas necessidades',
-          style: TextStyle(
-            fontSize: Responsive.isMobile(context) ? 14 : 16,
-            color: AppTheme.textSecondaryColor,
-          ),
-        ),
-        const SizedBox(height: 32),
-        
+        _buildPlanOptions(),
+      ],
+    );
+  }
+
+  Widget _buildPlanOptions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         // Seletor de plano anual ou mensal
         Container(
           margin: const EdgeInsets.only(bottom: 32),
@@ -507,14 +641,22 @@ class _RegisterPageState extends State<RegisterPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildPlanTypeOption('Mensal', !_isAnnualPlan, () {
-                      setState(() {
-                        _isAnnualPlan = false;
-                      });
+                      if (_isAnnualPlan) {
+                        setState(() {
+                          _isAnnualPlan = false;
+                          // Atualizar os preços diretamente
+                          _updatePlanPrices();
+                        });
+                      }
                     }),
                     _buildPlanTypeOption('Anual', _isAnnualPlan, () {
-                      setState(() {
-                        _isAnnualPlan = true;
-                      });
+                      if (!_isAnnualPlan) {
+                        setState(() {
+                          _isAnnualPlan = true;
+                          // Atualizar os preços diretamente
+                          _updatePlanPrices();
+                        });
+                      }
                     }),
                   ],
                 ),
@@ -525,21 +667,21 @@ class _RegisterPageState extends State<RegisterPage> {
         
         // Opções de plano
         _buildSimplePlanOption(
-          'Plano Básico',
+          'Plano Essencial',
           'Bot no WhatsApp',
-          _isAnnualPlan ? 'R\$ 142,00/ano' : 'R\$ 13,90/mês',
-          _selectedPlan == 'Básico',
+          _plans.isNotEmpty ? (_plans[0].price) : (_isAnnualPlan ? 'R\$ 163,00' : 'R\$ 15,90'),
+          _selectedPlan == 'Essencial',
           () {
             setState(() {
-              _selectedPlan = 'Básico';
+              _selectedPlan = 'Essencial';
             });
           },
         ),
         const SizedBox(height: 16),
         _buildSimplePlanOption(
           'Plano Premium',
-          'Bot + Dashboard',
-          _isAnnualPlan ? 'R\$ 228,00/ano' : 'R\$ 22,90/mês',
+          'Bot + Dashboard completo',
+          _plans.isNotEmpty && _plans.length > 1 ? (_plans[1].price) : (_isAnnualPlan ? 'R\$ 254,00' : 'R\$ 24,90'),
           _selectedPlan == 'Premium',
           () {
             setState(() {
@@ -644,22 +786,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Informações Pessoais',
-          style: TextStyle(
-            fontSize: Responsive.isMobile(context) ? 18 : 20,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimaryColor,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Informe seus dados pessoais para criar sua conta',
-          style: TextStyle(
-            fontSize: Responsive.isMobile(context) ? 14 : 16,
-            color: AppTheme.textSecondaryColor,
-          ),
-        ),
         const SizedBox(height: 32),
         CustomTextField(
           label: 'Nome completo *',
@@ -812,14 +938,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Credenciais de acesso',
-          style: TextStyle(
-            fontSize: Responsive.isMobile(context) ? 18 : 20,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimaryColor,
-          ),
-        ),
         const SizedBox(height: 16),
         Text(
           'Crie suas credenciais para acessar a plataforma',
@@ -839,9 +957,21 @@ class _RegisterPageState extends State<RegisterPage> {
             if (value == null || value.isEmpty) {
               return 'Por favor, informe seu email';
             }
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Por favor, informe um email válido';
+            
+            // Regex mais completa para validação de email
+            if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) {
+              return 'Por favor, informe um email válido (exemplo@dominio.com)';
             }
+            
+            // Verificações adicionais
+            if (value.contains('..') || value.startsWith('.') || value.endsWith('.')) {
+              return 'Email inválido: não pode conter pontos consecutivos ou começar/terminar com ponto';
+            }
+            
+            if (!value.contains('@') || value.indexOf('@') != value.lastIndexOf('@')) {
+              return 'Email inválido: deve conter exatamente um caractere @';
+            }
+            
             return null;
           },
         ),

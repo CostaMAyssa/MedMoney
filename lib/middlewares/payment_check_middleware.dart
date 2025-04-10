@@ -26,6 +26,7 @@ class _PaymentCheckMiddlewareState extends State<PaymentCheckMiddleware> {
     '/payment-required',
     '/forgot-password',
     '/reset-password',
+    '/dashboard', // Permitir acesso ao dashboard sem verificação
   ];
 
   @override
@@ -93,20 +94,17 @@ class _PaymentCheckMiddlewareState extends State<PaymentCheckMiddleware> {
     }
     
     if (!_hasActiveSubscription) {
-      // Redirecionar para a página de pagamento requerido
-      // Mas não redirecionar se já estamos na página de pagamento
-      if (!currentRoute.contains('/payment')) {
+      // Não redirecionar se já estamos no dashboard ou em uma página pública
+      if (!currentRoute.contains('/payment') && 
+          !currentRoute.contains('/dashboard') && 
+          !_publicRoutes.contains(currentRoute)) {
         Future.microtask(() {
-          Navigator.pushReplacementNamed(context, '/payment-required');
+          Navigator.pushReplacementNamed(context, '/dashboard'); // Ir para o dashboard em vez da página de pagamento
         });
       }
       
-      // Enquanto o redirecionamento não acontece, mostrar um indicador de carregamento
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      // Retornar o widget filho para permitir o acesso
+      return widget.child;
     }
     
     return widget.child;
