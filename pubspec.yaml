@@ -62,6 +62,7 @@ flutter:
     - .env
     - assets/images/
     - assets/pdf/
+    - lib/assets/
     - lib/utils/Termos de Uso Plataforma MedMoney.pdf
 
 flutter_icons:

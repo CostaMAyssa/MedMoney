@@ -4,6 +4,7 @@ import '../widgets/app_header.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/responsive_container.dart';
+import '../widgets/image_carousel.dart';
 import '../providers/auth_provider.dart';
 import '../utils/theme.dart';
 import '../utils/routes.dart';
@@ -783,35 +784,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 48),
-          Container(
-            width: double.infinity,
-            height: 400,
-            decoration: BoxDecoration(
-              color: Color(0xFF1A1A4F), // Cor escura para o fundo do container
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Color(0xFF2A2A5F),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                'Demonstração Interativa',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-            ),
-          ),
+          ImageCarousel(),
         ],
       ),
     );
