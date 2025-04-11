@@ -172,6 +172,23 @@ class SupabaseService {
     }
   }
   
+  // Método de recuperação de senha
+  Future<void> resetPassword(String email) async {
+    try {
+      debugPrint('Iniciando processo de recuperação de senha para: $email');
+      
+      await client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'https://medmoney.me:8080/reset-password',
+      );
+      
+      debugPrint('Email de recuperação de senha enviado com sucesso');
+    } catch (e) {
+      debugPrint('Erro ao solicitar recuperação de senha: $e');
+      rethrow;
+    }
+  }
+  
   // Perfil do usuário
   Future<Map<String, dynamic>> getUserProfile() async {
     try {

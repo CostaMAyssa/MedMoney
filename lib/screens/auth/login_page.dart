@@ -8,6 +8,7 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/responsive_container.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/routes.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -320,7 +321,8 @@ class _LoginPageState extends State<LoginPage> {
                                     alignment: Alignment.centerRight,
                                     child: TextButton(
                                       onPressed: () {
-                                        // Implementar recuperação de senha
+                                        // Navegar para a página de recuperação de senha
+                                        Navigator.pushNamed(context, AppRoutes.forgotPassword);
                                       },
                                       child: Text(
                                         'Esqueceu sua senha?',
