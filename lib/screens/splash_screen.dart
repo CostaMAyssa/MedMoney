@@ -127,6 +127,15 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 100,
                   height: 100,
                   fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    debugPrint('Erro ao carregar logo: $error');
+                    // Fallback para um ícone quando a imagem falha
+                    return Icon(
+                      Icons.medical_services,
+                      size: 80,
+                      color: AppTheme.primaryColor,
+                    );
+                  },
                 ),
               ),
             ),

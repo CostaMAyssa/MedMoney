@@ -51,8 +51,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       } catch (e) {
         if (mounted) {
           setState(() {
-            _errorMessage = 'Erro ao solicitar redefinição de senha: ${e.toString()}';
             _isLoading = false;
+            
+            // Mensagens de erro mais amigáveis baseadas no erro específico
+            String errorMsg = e.toString();
+            if (errorMsg.contains('email rate limit exceeded')) {
+              _errorMessage = 'Muitas solicitações de recuperação de senha foram enviadas recentemente. Por favor, aguarde alguns minutos antes de tentar novamente.';
+            } else if (errorMsg.contains('Muitas solicitações de redefinição de senha')) {
+              _errorMessage = errorMsg; // Usar a mensagem de throttling que já formatamos
+            } else if (errorMsg.contains('Invalid email')) {
+              _errorMessage = 'O email informado não é válido. Por favor, verifique e tente novamente.';
+            } else if (errorMsg.contains('User not found')) {
+              _errorMessage = 'Não encontramos uma conta com este email. Verifique o email ou crie uma nova conta.';
+            } else {
+              _errorMessage = 'Não foi possível enviar o email de recuperação. Por favor, tente novamente mais tarde.';
+            }
           });
         }
       }

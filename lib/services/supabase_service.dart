@@ -42,6 +42,58 @@ class SupabaseService {
     );
   }
   
+  // Armazenar últimas solicitações de redefinição de senha
+  static final Map<String, DateTime> _lastPasswordResetRequests = {};
+  static const Duration _passwordResetThrottleDuration = Duration(minutes: 5);
+
+  // Método de recuperação de senha com limitação de taxa
+  Future<void> resetPassword(String email) async {
+    try {
+      // Verificar se já existe uma solicitação recente para este email
+      final lastRequest = _lastPasswordResetRequests[email];
+      final now = DateTime.now();
+      
+      if (lastRequest != null) {
+        final difference = now.difference(lastRequest);
+        
+        // Se a última solicitação foi feita há menos de 5 minutos, bloqueie
+        if (difference < _passwordResetThrottleDuration) {
+          final remainingSeconds = _passwordResetThrottleDuration.inSeconds - difference.inSeconds;
+          throw Exception(
+            'Muitas solicitações de redefinição de senha. Por favor, aguarde mais ${remainingSeconds ~/ 60} minutos e ${remainingSeconds % 60} segundos antes de tentar novamente.'
+          );
+        }
+      }
+      
+      debugPrint('Iniciando processo de recuperação de senha para: $email');
+      
+      // Registrar esta solicitação
+      _lastPasswordResetRequests[email] = now;
+      
+      try {
+        await client.auth.resetPasswordForEmail(
+          email,
+          redirectTo: 'https://medmoney.me:8080/reset-password',
+        );
+        
+        debugPrint('Email de recuperação de senha enviado com sucesso');
+      } catch (supabaseError) {
+        debugPrint('Erro do Supabase: $supabaseError');
+        // Tratar especificamente o erro de limite de taxa do Supabase
+        if (supabaseError.toString().contains('email rate limit exceeded')) {
+          throw Exception(
+            'Muitas solicitações de recuperação de senha foram enviadas recentemente. Por favor, aguarde alguns minutos antes de tentar novamente.'
+          );
+        }
+        // Repassar outros erros
+        rethrow;
+      }
+    } catch (e) {
+      debugPrint('Erro ao solicitar recuperação de senha: $e');
+      rethrow;
+    }
+  }
+  
   // Autenticação
   Future<AuthResponse> signUp({
     required String email,
@@ -168,23 +220,6 @@ class SupabaseService {
       await client.auth.signOut();
     } catch (e) {
       debugPrint('Erro ao fazer logout: $e');
-      rethrow;
-    }
-  }
-  
-  // Método de recuperação de senha
-  Future<void> resetPassword(String email) async {
-    try {
-      debugPrint('Iniciando processo de recuperação de senha para: $email');
-      
-      await client.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'https://medmoney.me:8080/reset-password',
-      );
-      
-      debugPrint('Email de recuperação de senha enviado com sucesso');
-    } catch (e) {
-      debugPrint('Erro ao solicitar recuperação de senha: $e');
       rethrow;
     }
   }
