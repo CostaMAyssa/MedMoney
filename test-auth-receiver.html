@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Comunicação Flutter-React</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0A0A3E;
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #12124a;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            margin-top: 0;
+            color: #B9A4F4;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background-color: rgba(0, 255, 0, 0.2);
+            border: 1px solid green;
+        }
+        .error {
+            background-color: rgba(255, 0, 0, 0.2);
+            border: 1px solid red;
+        }
+        .warning {
+            background-color: rgba(255, 165, 0, 0.2);
+            border: 1px solid orange;
+        }
+        .info-panel {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .log-panel {
+            background-color: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        button {
+            background-color: #B9A4F4;
+            color: #0A0A3E;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #a08be0;
+        }
+        .param-value {
+            font-weight: bold;
+            color: #B9A4F4;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste de Autenticação MedMoney</h1>
+        
+        <div id="auth-status" class="status warning">
+            Aguardando autenticação do Flutter...
+        </div>
+        
+        <div class="info-panel">
+            <h3>Dados de Autenticação</h3>
+            <p>Token: <span id="token-value" class="param-value">Nenhum token recebido</span></p>
+            <p>User ID: <span id="userid-value" class="param-value">Nenhum ID recebido</span></p>
+            <p>Método de Recebimento: <span id="auth-method" class="param-value">Nenhum</span></p>
+        </div>
+        
+        <div>
+            <h3>Log de Comunicação</h3>
+            <div id="log-panel" class="log-panel"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button id="test-btn">Enviar Mensagem para Flutter</button>
+            <button id="clear-log">Limpar Log</button>
+        </div>
+    </div>
+
+    <script>
+        // Elementos da UI
+        const authStatus = document.getElementById('auth-status');
+        const tokenValue = document.getElementById('token-value');
+        const userIdValue = document.getElementById('userid-value');
+        const authMethod = document.getElementById('auth-method');
+        const logPanel = document.getElementById('log-panel');
+        const testBtn = document.getElementById('test-btn');
+        const clearLogBtn = document.getElementById('clear-log');
+        
+        // Função para adicionar logs
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            let color = '#00ff00'; // verde para info
+            
+            if (type === 'error') color = '#ff5555';
+            if (type === 'warning') color = '#ffcc00';
+            if (type === 'success') color = '#00ccff';
+            
+            logPanel.innerHTML += `<div style="color:${color}">[${timestamp}] ${message}</div>`;
+            logPanel.scrollTop = logPanel.scrollHeight; // Auto-scroll para o final
+        }
+        
+        // Verificar parâmetros da URL (query string)
+        function checkUrlParams() {
+            addLog('Verificando parâmetros da URL...');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenFromUrl = urlParams.get('token');
+            const userIdFromUrl = urlParams.get('userId');
+            
+            if (tokenFromUrl) {
+                addLog('Token encontrado na URL!', 'success');
+                tokenValue.textContent = tokenFromUrl.substring(0, 10) + '...';
+                authMethod.textContent = 'URL Query Parameter';
+                updateAuthStatus('success', 'Autenticado via parâmetros de URL');
+            }
+            
+            if (userIdFromUrl) {
+                addLog('User ID encontrado na URL!', 'success');
+                userIdValue.textContent = userIdFromUrl;
+            }
+            
+            if (!tokenFromUrl && !userIdFromUrl) {
+                addLog('Nenhum parâmetro de autenticação encontrado na URL', 'warning');
+            }
+            
+            return { token: tokenFromUrl, userId: userIdFromUrl };
+        }
+        
+        // Configurar listener para receber mensagens do Flutter via postMessage
+        function setupMessageListener() {
+            addLog('Configurando listener para mensagens...');
+            
+            window.addEventListener('message', function(event) {
+                addLog(`Mensagem recebida de: ${event.origin}`, 'info');
+                
+                try {
+                    // Tentar converter a mensagem para objeto JSON
+                    let data = event.data;
+                    if (typeof data === 'string') {
+                        data = JSON.parse(data);
+                        addLog('Mensagem analizada com sucesso: ' + JSON.stringify(data, null, 2));
+                    }
+                    
+                    // Verificar se é uma mensagem de autenticação
+                    if (data && data.type === 'AUTH_DATA') {
+                        addLog('Dados de autenticação recebidos via postMessage!', 'success');
+                        
+                        if (data.token) {
+                            tokenValue.textContent = data.token.substring(0, 10) + '...';
+                            addLog('Token recebido: ' + data.token.substring(0, 10) + '...', 'success');
+                        }
+                        
+                        if (data.userId) {
+                            userIdValue.textContent = data.userId;
+                            addLog('User ID recebido: ' + data.userId, 'success');
+                        }
+                        
+                        authMethod.textContent = 'postMessage';
+                        updateAuthStatus('success', 'Autenticado via postMessage');
+                        
+                        // Enviar confirmação para o Flutter
+                        if (event.source) {
+                            addLog('Enviando confirmação de recebimento para o Flutter', 'info');
+                            event.source.postMessage(JSON.stringify({
+                                type: 'AUTH_CONFIRM',
+                                message: 'Autenticação recebida com sucesso!'
+                            }), '*');
+                        }
+                    } else {
+                        addLog('Mensagem recebida, mas não é AUTH_DATA: ' + JSON.stringify(data), 'warning');
+                    }
+                } catch (error) {
+                    addLog(`Erro ao processar mensagem: ${error.message}`, 'error');
+                    addLog(`Conteúdo da mensagem: ${typeof event.data === 'string' ? event.data : '[Objeto]'}`, 'error');
+                }
+            });
+        }
+        
+        // Atualizar status de autenticação
+        function updateAuthStatus(type, message) {
+            authStatus.className = 'status ' + type;
+            authStatus.textContent = message;
+        }
+        
+        // Inicializar a página
+        function init() {
+            addLog('Página de teste inicializada', 'info');
+            
+            // Verificar autenticação da URL primeiro
+            const urlAuthData = checkUrlParams();
+            
+            // Configurar listener para mensagens (postMessage)
+            setupMessageListener();
+            
+            // Botão de teste para enviar mensagem para o Flutter
+            testBtn.addEventListener('click', function() {
+                addLog('Tentando enviar mensagem para o Flutter...', 'info');
+                
+                try {
+                    window.parent.postMessage(JSON.stringify({
+                        type: 'TEST_MESSAGE',
+                        message: 'Hello from React test page!',
+                        timestamp: new Date().toISOString()
+                    }), '*');
+                    addLog('Mensagem enviada para o Flutter', 'success');
+                } catch (error) {
+                    addLog(`Erro ao enviar mensagem: ${error.message}`, 'error');
+                }
+            });
+            
+            // Botão para limpar logs
+            clearLogBtn.addEventListener('click', function() {
+                logPanel.innerHTML = '';
+                addLog('Log limpo', 'info');
+            });
+            
+            // Se nenhuma autenticação for encontrada após 5 segundos, mostrar alerta
+            setTimeout(function() {
+                if (authStatus.className.includes('warning')) {
+                    addLog('5 segundos se passaram sem autenticação completa', 'warning');
+                    
+                    if (!urlAuthData.token) {
+                        addLog('Enviando solicitação de autenticação para o Flutter', 'info');
+                        try {
+                            window.parent.postMessage(JSON.stringify({
+                                type: 'AUTH_REQUEST',
+                                message: 'Por favor envie credenciais de autenticação'
+                            }), '*');
+                        } catch (error) {
+                            addLog(`Erro ao solicitar autenticação: ${error.message}`, 'error');
+                        }
+                    }
+                }
+            }, 5000);
+        }
+        
+        // Iniciar quando a página estiver carregada
+        window.onload = init;
+    </script>
+</body>
+</html> 

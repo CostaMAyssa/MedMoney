@@ -11,6 +11,7 @@ import '../../services/supabase_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/routes.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -29,6 +30,12 @@ class _DashboardPageState extends State<DashboardPage> {
   // URL do dashboard React
   String _dashboardUrl = 'http://medmoney.me:8081'; // Apontando diretamente para o VPS para testes
   
+  // URL de fallback caso a primeira falhe (para testes)
+  String _fallbackDashboardUrl = 'https://medmoney-dashboard.vercel.app'; // URL alternativa
+  
+  // Controle se estamos usando a URL principal ou fallback
+  bool _usingFallbackUrl = false;
+  
   // ID único para o iframe
   final String _iframeElementId = 'dashboard-iframe';
   
@@ -40,6 +47,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     debugPrint('===== INICIANDO DASHBOARD =====');
     debugPrint('Modo: ${kIsWeb ? "Web/Iframe" : "Mobile/WebView"}');
+    debugPrint('URL inicial: $_dashboardUrl');
     
     _checkSubscription();
     
@@ -61,165 +69,341 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
   
+  // Alternar entre a URL principal e fallback
+  void _toggleDashboardUrl() {
+    setState(() {
+      _usingFallbackUrl = !_usingFallbackUrl;
+      _isLoading = true;
+      _iframeError = false;
+    });
+    
+    final newUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
+    debugPrint('Alternando para ${_usingFallbackUrl ? "URL FALLBACK" : "URL PRINCIPAL"}: $newUrl');
+    
+    if (kIsWeb) {
+      _registerIframe();
+    } else if (_webViewController != null) {
+      _initWebView();
+    }
+  }
+  
   // Registrar o iframe para uso no Flutter Web
   void _registerIframe() {
-    // Obter token para autenticação
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    debugPrint('[Dashboard] Registrando iframe com ID: $_iframeElementId');
     
-    debugPrint('Token obtido: ${token != null ? "Sim (${token.substring(0, 10)}...)" : "Não"}');
+    // Obtendo tokens e ID do usuário
+    final session = Supabase.instance.client.auth.currentSession;
+    final String? token = session?.accessToken;
+    final String? refreshToken = session?.refreshToken;
+    final String? userId = Supabase.instance.client.auth.currentUser?.id;
     
-    // URL simplificada com apenas o token, como o dashboard espera
-    final dashboardUrlWithAuth = Uri.parse(_dashboardUrl).replace(
+    debugPrint('[Dashboard] Token disponível: ${token != null}');
+    debugPrint('[Dashboard] User ID disponível: ${userId != null}');
+    
+    if (token == null || userId == null) {
+      debugPrint('[Dashboard] ERRO: Token ou User ID não disponíveis');
+      setState(() {
+        _iframeError = true;
+        _errorMessage = 'Erro de autenticação. Por favor, faça login novamente.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Construir URL com parâmetros de autenticação
+    final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
+    final url = Uri.parse(baseUrl).replace(
       queryParameters: {
         'token': token,
-        // Removido userId e refreshToken pois o dashboard não os processa
+        'userId': userId,
+        'refreshToken': refreshToken,
+        't': DateTime.now().millisecondsSinceEpoch.toString(), // Evita cache
       },
     ).toString();
     
-    debugPrint('Carregando dashboard React de: $dashboardUrlWithAuth');
-    
-    // Registrar um elemento de visualização para o iframe
-    ui_web.platformViewRegistry.registerViewFactory(
-      _iframeElementId,
-      (int viewId) {
-        debugPrint('Criando elemento iframe (viewId: $viewId)');
-        final iframe = html.IFrameElement()
-          ..src = dashboardUrlWithAuth
-          ..style.border = 'none'
-          ..style.height = '100%'
-          ..style.width = '100%'
-          ..style.backgroundColor = '#0A0A3E'
-          ..allowFullscreen = true;
+    debugPrint('[Dashboard] Carregando URL: $url');
+
+    // Criar e configurar elemento iframe
+    ui_web.platformViewRegistry.registerViewFactory(_iframeElementId, (int viewId) {
+      final iframe = html.IFrameElement()
+        ..id = 'dashboard-iframe'
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.overflow = 'hidden'
+        ..src = url
+        ..allow = 'camera; microphone; fullscreen; display-capture'
+        ..allowFullscreen = true;
+      
+      // Monitorar erros de carregamento
+      iframe.onError.listen((event) {
+        debugPrint('[Dashboard] ERRO ao carregar iframe: ${event.toString()}');
+        _setIframeError(true);
+      });
+
+      // Monitorar carregamento do iframe
+      iframe.onLoad.listen((event) {
+        debugPrint('[Dashboard] Iframe carregado com sucesso');
+        _setIframeError(false);
         
-        // Permitir comunicação e recursos
-        iframe.setAttribute('allow', 'autoplay; camera; microphone; fullscreen');
+        // Enviar mensagem com os dados de autenticação para o dashboard
+        Future.delayed(const Duration(milliseconds: 500), () {
+          try {
+            // Atenção: formato adaptado para o que o React espera
+            final authMessage = {
+              'type': 'AUTH_DATA',
+              'token': token,
+              'userId': userId,
+              'refreshToken': refreshToken,
+            };
+            
+            debugPrint('[Dashboard] Enviando dados de autenticação via postMessage');
+            iframe.contentWindow?.postMessage(jsonEncode(authMessage), '*');
+          } catch (e) {
+            debugPrint('[Dashboard] ERRO ao enviar mensagem para iframe: $e');
+          }
+        });
+      });
+
+      return iframe;
+    });
+
+    // Configurar listener para mensagens do iframe
+    html.window.onMessage.listen((html.MessageEvent event) {
+      try {
+        debugPrint('[Dashboard] Mensagem recebida do iframe: ${event.data}');
         
-        // Monitorar carregamento e erros
-        iframe.onLoad.listen((_) {
-          debugPrint('Dashboard carregado com sucesso no iframe');
+        // Tentar decodificar a mensagem
+        // Mas primeiro verificar se é uma string de JSON válida
+        if (event.data is String && event.data.toString().trim().startsWith('{')) {
+          final data = jsonDecode(event.data);
+          _processMessageFromDashboard(data);
+        } else {
+          debugPrint('[Dashboard] Formato de mensagem não reconhecido, ignorando');
+        }
+      } catch (e) {
+        debugPrint('[Dashboard] ERRO ao processar mensagem do iframe: $e');
+      }
+    });
+
+    Future.delayed(Duration(seconds: 5), () {
+      if (_isLoading && mounted) {
+        debugPrint('[Dashboard] Timeout de carregamento, verificando estado do iframe');
+        final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
+        
+        if (iframe == null) {
+          debugPrint('[Dashboard] Iframe não encontrado no DOM');
+          _setIframeError(true);
+        } else {
+          debugPrint('[Dashboard] Iframe está presente no DOM');
           setState(() {
             _isLoading = false;
           });
-        });
-        
-        iframe.onError.listen((event) {
-          debugPrint('ERRO ao carregar o dashboard React: $event');
-          setState(() {
-            _iframeError = true;
-          });
-        });
-        
-        // Adicionar listener para mensagens do console do iframe (para debug)
-        html.window.addEventListener('message', (event) {
-          if (event is html.MessageEvent) {
-            debugPrint('Mensagem recebida do iframe: ${event.data}');
-          }
-        });
-        
-        return iframe;
-      },
-    );
+        }
+      }
+    });
   }
-  
+
   // Inicializar WebView para dispositivos móveis
   void _initWebView() {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    debugPrint('[Dashboard] Inicializando WebView para dispositivos móveis');
     
-    // URL simplificada apenas com o token
-    final dashboardUrl = Uri.parse(_dashboardUrl).replace(
+    final session = Supabase.instance.client.auth.currentSession;
+    final String? token = session?.accessToken;
+    final String? userId = Supabase.instance.client.auth.currentUser?.id;
+    
+    if (token == null || userId == null) {
+      setState(() {
+        _errorMessage = 'Erro de autenticação. Por favor, faça login novamente.';
+        _isLoading = false;
+      });
+      return;
+    }
+    
+    // Escolher URL base (principal ou fallback)
+    final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
+    
+    // URL com os tokens necessários
+    final url = Uri.parse(baseUrl).replace(
       queryParameters: {
         'token': token,
-        // Removido userId e refreshToken
+        'userId': userId,
+        'refreshToken': session?.refreshToken,
+        't': DateTime.now().millisecondsSinceEpoch.toString(),
       },
     ).toString();
     
-    debugPrint('Inicializando WebView para dashboard: $dashboardUrl');
+    debugPrint('[Dashboard] Carregando URL no WebView: $url');
     
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
+            if (mounted) {
+              setState(() {
+                _isLoading = true;
+              });
+            }
           },
           onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-            
-            // Removido código que tentava injetar tokens no localStorage
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+              
+              // Injetar script para adicionar listener de mensagem
+              _webViewController?.runJavaScript('''
+                window.addEventListener('message', function(event) {
+                  console.log('Mensagem recebida no WebView:', event.data);
+                  window.flutter_inappwebview.callHandler('messageHandler', event.data);
+                });
+                
+                // Notificar que o WebView está pronto
+                window.parent.postMessage(JSON.stringify({
+                  type: 'WEBVIEW_READY'
+                }), '*');
+              ''');
+            }
           },
           onWebResourceError: (WebResourceError error) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Erro ao carregar dashboard: ${error.description}';
-            });
+            debugPrint('[Dashboard] ERRO WebView: ${error.description}');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = 'Erro ao carregar dashboard: ${error.description}';
+              });
+            }
           },
         ),
       )
-      ..loadRequest(Uri.parse(dashboardUrl));
+      ..loadRequest(Uri.parse(url));
   }
-  
-  // Processar mensagens recebidas do dashboard
-  void _handleDashboardMessage(String message) {
-    debugPrint('Mensagem recebida do dashboard React: $message');
-    
-    try {
-      // Processar diferentes tipos de mensagens do dashboard React
-      if (message.contains('DATA_UPDATED')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dados atualizados no dashboard'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
-      } else if (message.contains('AUTH_ERROR')) {
-        _logout();
-      } else if (message.contains('TOKEN_REFRESH_NEEDED')) {
-        // Atualizar token e enviar de volta
-        _refreshToken();
-      }
-    } catch (e) {
-      debugPrint('Erro ao processar mensagem do dashboard: $e');
+
+  void _setIframeError(bool hasError) {
+    if (mounted) {
+      setState(() {
+        _iframeError = hasError;
+        _isLoading = false;
+        if (hasError) {
+          _errorMessage = 'Não foi possível carregar o dashboard. Verifique sua conexão.';
+        } else {
+          _errorMessage = null;
+        }
+      });
     }
   }
-  
-  // Método para atualizar token
+
+  void _processMessageFromDashboard(Map<String, dynamic> data) {
+    if (!mounted) return;
+    
+    debugPrint('[Dashboard] Processando mensagem: ${data['type']}');
+    
+    switch (data['type']) {
+      case 'DASHBOARD_READY':
+        debugPrint('[Dashboard] Dashboard pronto para receber dados');
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Reenvia os dados de autenticação para garantir
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null && kIsWeb) {
+          final authData = {
+            'type': 'AUTH_DATA',
+            'token': session.accessToken,
+            'userId': Supabase.instance.client.auth.currentUser?.id,
+            'refreshToken': session.refreshToken,
+          };
+          
+          debugPrint('[Dashboard] Reenviando dados de autenticação após DASHBOARD_READY');
+          final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
+          iframe?.contentWindow?.postMessage(jsonEncode(authData), '*');
+        }
+        break;
+      case 'TOKEN_EXPIRED':
+        debugPrint('[Dashboard] Token expirado, tentando renovar');
+        _refreshToken();
+        break;
+      case 'UPDATE_SUBSCRIPTION':
+        debugPrint('[Dashboard] Atualizando informações de assinatura');
+        _checkSubscription();
+        break;
+      case 'ERROR':
+        debugPrint('[Dashboard] Erro reportado pelo dashboard: ${data['message']}');
+        setState(() {
+          _errorMessage = data['message'] ?? 'Erro no dashboard';
+        });
+        break;
+      case 'LOGOUT':
+        debugPrint('[Dashboard] Solicitação de logout recebida');
+        _logout();
+        break;
+      default:
+        debugPrint('[Dashboard] Tipo de mensagem não reconhecido: ${data['type']}');
+    }
+  }
+
   Future<void> _refreshToken() async {
+    debugPrint('[Dashboard] Iniciando renovação de token');
     try {
-      final supabase = Supabase.instance.client;
-      final session = supabase.auth.currentSession;
+      // Obter nova sessão
+      final response = await Supabase.instance.client.auth.refreshSession();
+      final session = response.session;
       
       if (session != null) {
-        // Atualizar sessão
-        final newToken = session.accessToken;
-        
-        // Enviar novo token para o iframe/webview
+        debugPrint('[Dashboard] Token renovado com sucesso');
+        // Enviar novo token para o iframe
         if (kIsWeb) {
-          final message = {
-            'type': 'TOKEN_REFRESHED',
-            'data': {
-              'token': newToken,
-            }
+          final authData = {
+            'type': 'AUTH_DATA',
+            'token': session.accessToken,
+            'userId': session.user.id,
+            'refreshToken': session.refreshToken,
           };
-          final jsonMessage = json.encode(message);
           
-          // Enviar através do postMessage
-          html.window.postMessage(jsonMessage, '*');
+          final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
+          iframe?.contentWindow?.postMessage(jsonEncode(authData), '*');
+          debugPrint('[Dashboard] Novo token enviado para o dashboard');
         } else if (_webViewController != null) {
-          // Atualizar token no localStorage do WebView
-          _webViewController!.runJavaScript('''
-            localStorage.setItem('supabaseToken', '$newToken');
-            window.dispatchEvent(new CustomEvent('tokenRefreshed', {
-              detail: { token: '$newToken' }
-            }));
-          ''');
+          // Para WebView mobile
+          final authData = jsonEncode({
+            'type': 'AUTH_DATA',
+            'token': session.accessToken,
+            'userId': session.user.id,
+            'refreshToken': session.refreshToken,
+          });
+          
+          await _webViewController?.runJavaScript(
+            "window.postMessage($authData, '*');"
+          );
+          debugPrint('[Dashboard] Novo token enviado para WebView');
+        }
+      } else {
+        debugPrint('[Dashboard] Falha ao renovar token: sessão nula');
+        // Token não pode ser renovado, redirecionar para login
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sua sessão expirou. Por favor, faça login novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
         }
       }
     } catch (e) {
-      debugPrint('Erro ao atualizar token: $e');
+      debugPrint('[Dashboard] Erro ao renovar token: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao renovar sessão: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        // Em caso de erro grave, redirecionar para login
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     }
   }
 
@@ -292,10 +476,19 @@ class _DashboardPageState extends State<DashboardPage> {
       */
     } catch (e) {
       debugPrint('Erro ao verificar assinatura: $e');
-      setState(() {
-        _isCheckingSubscription = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingSubscription = false;
+        });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    // Limpar controlador do WebView
+    _webViewController = null;
+    super.dispose();
   }
 
   @override
@@ -325,10 +518,66 @@ class _DashboardPageState extends State<DashboardPage> {
               fit: BoxFit.contain,
             ),
             const SizedBox(width: 12),
-            const Text('Dashboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Dashboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(
+                  _usingFallbackUrl ? 'URL alternativa' : 'URL principal',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _usingFallbackUrl ? Colors.amber : Colors.green,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
         actions: [
+          // Botão para abrir no navegador (apenas Web)
+          if (kIsWeb)
+            IconButton(
+              icon: const Icon(Icons.open_in_new, size: 26),
+              onPressed: () {
+                // Obter URL com token
+                final token = Supabase.instance.client.auth.currentSession?.accessToken;
+                final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
+                final urlWithToken = Uri.parse(baseUrl).replace(
+                  queryParameters: {
+                    'token': token,
+                  },
+                ).toString();
+                
+                // Abrir em nova janela
+                html.window.open(urlWithToken, '_blank');
+              },
+              tooltip: 'Abrir em nova janela',
+            ),
+          // Botão para recarregar o dashboard
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 26),
+            onPressed: () {
+              debugPrint('Recarregando dashboard...');
+              setState(() {
+                _isLoading = true;
+                _iframeError = false;
+                _errorMessage = null;
+              });
+              if (kIsWeb) {
+                _registerIframe();
+              } else if (_webViewController != null) {
+                _initWebView();
+              }
+            },
+          ),
+          // Botão para alternar URL
+          IconButton(
+            icon: const Icon(Icons.swap_horiz, size: 26),
+            onPressed: () {
+              _toggleDashboardUrl();
+            },
+            tooltip: _usingFallbackUrl ? 'Usar URL principal' : 'Usar URL alternativa',
+          ),
           // Exibir status da assinatura
           if (_subscription != null)
             Padding(
@@ -365,6 +614,59 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: const Icon(Icons.logout, size: 26),
             onPressed: _logout,
           ),
+          // Botão para visualizar logs (Apenas em modo debug)
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.info_outline, size: 26),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Informações de Depuração'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('URL: ${_usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl}'),
+                          const SizedBox(height: 8),
+                          Text('Token disponível: ${Supabase.instance.client.auth.currentSession?.accessToken != null}'),
+                          Text('User ID: ${Supabase.instance.client.auth.currentUser?.id ?? "Não disponível"}'),
+                          const SizedBox(height: 8),
+                          Text('Status: ${_isLoading ? "Carregando" : _iframeError ? "Erro" : "Carregado"}'),
+                          if (_errorMessage != null)
+                            Text('Erro: $_errorMessage', style: const TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Fechar'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _isLoading = true;
+                            _iframeError = false;
+                          });
+                          if (kIsWeb) {
+                            _registerIframe();
+                          } else if (_webViewController != null) {
+                            _initWebView();
+                          }
+                        },
+                        child: const Text('Recarregar'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              tooltip: 'Informações de Depuração',
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -417,21 +719,49 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Tentando carregar o dashboard de: $_dashboardUrl',
+              'Tentando carregar o dashboard de: ${_usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl}',
               style: const TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondaryColor,
               ),
               textAlign: TextAlign.center,
             ),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    color: AppTheme.errorColor,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _iframeError = false;
-                });
-              },
-              child: const Text('Tentar novamente'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _iframeError = false;
+                      _isLoading = true;
+                      _errorMessage = null;
+                    });
+                    _registerIframe();
+                  },
+                  child: const Text('Tentar novamente'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _toggleDashboardUrl,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                  ),
+                  child: Text(_usingFallbackUrl ? 'Usar URL principal' : 'Usar URL alternativa'),
+                ),
+              ],
             ),
           ],
         ),
@@ -590,9 +920,11 @@ class _DashboardPageState extends State<DashboardPage> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 } 

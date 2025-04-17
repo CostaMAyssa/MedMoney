@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedMoney Dashboard - Teste</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .token-display {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+        .log-container {
+            height: 200px;
+            overflow-y: auto;
+            background-color: #333;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MedMoney Dashboard Teste</h1>
+            <div id="status">Carregando...</div>
+        </div>
+        
+        <h2>Tokens Recebidos</h2>
+        <div class="token-display">
+            <strong>Token:</strong> <span id="token">Aguardando...</span>
+        </div>
+        <div class="token-display">
+            <strong>User ID:</strong> <span id="userId">Aguardando...</span>
+        </div>
+        <div class="token-display">
+            <strong>Refresh Token:</strong> <span id="refreshToken">Aguardando...</span>
+        </div>
+        
+        <h2>Log de Comunicação</h2>
+        <div class="log-container" id="log"></div>
+        
+        <button id="sendMessage">Enviar Mensagem para Flutter</button>
+    </div>
+
+    <script>
+        // Função para adicionar mensagens ao log
+        function logMessage(message) {
+            const logContainer = document.getElementById('log');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Extrai parâmetros da URL
+        function getUrlParams() {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            return {
+                token: urlParams.get('token'),
+                userId: urlParams.get('userId'),
+                refreshToken: urlParams.get('refreshToken')
+            };
+        }
+
+        // Função para enviar mensagem para o Flutter
+        function sendMessageToFlutter(message) {
+            logMessage(`Enviando mensagem para Flutter: ${JSON.stringify(message)}`);
+            window.parent.postMessage(message, '*');
+        }
+
+        // Manipulador de evento para quando a página carregar
+        window.addEventListener('load', function() {
+            // Obtém parâmetros da URL
+            const params = getUrlParams();
+            
+            // Atualiza a UI com os tokens
+            document.getElementById('token').textContent = params.token || 'Não recebido';
+            document.getElementById('userId').textContent = params.userId || 'Não recebido';
+            document.getElementById('refreshToken').textContent = params.refreshToken || 'Não recebido';
+            
+            // Registra nos logs
+            logMessage('Página carregada');
+            if (params.token) {
+                logMessage('Token recebido via URL');
+            } else {
+                logMessage('Nenhum token na URL. Esperando mensagem...');
+            }
+            
+            // Atualiza status
+            document.getElementById('status').textContent = params.token ? 'Conectado' : 'Aguardando autenticação';
+            
+            // Notifica o Flutter que o dashboard está pronto
+            sendMessageToFlutter({
+                type: 'dashboard_ready'
+            });
+        });
+
+        // Ouvinte para mensagens do Flutter
+        window.addEventListener('message', function(event) {
+            logMessage(`Mensagem recebida: ${JSON.stringify(event.data)}`);
+            
+            // Se a mensagem contiver tokens, atualiza a UI
+            if (event.data && event.data.token) {
+                document.getElementById('token').textContent = event.data.token;
+                document.getElementById('status').textContent = 'Conectado';
+            }
+            
+            if (event.data && event.data.userId) {
+                document.getElementById('userId').textContent = event.data.userId;
+            }
+            
+            if (event.data && event.data.refreshToken) {
+                document.getElementById('refreshToken').textContent = event.data.refreshToken;
+            }
+        });
+
+        // Manipulador do botão de enviar mensagem
+        document.getElementById('sendMessage').addEventListener('click', function() {
+            sendMessageToFlutter({
+                type: 'update_needed',
+                message: 'Atualização solicitada pelo dashboard'
+            });
+        });
+    </script>
+</body>
+</html> 
