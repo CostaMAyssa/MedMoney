@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 // Importações condicionais para web
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/routes.dart';
+import 'dart:convert';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -25,12 +26,14 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _subscription;
   WebViewController? _webViewController;
   
-  // URL do dashboard
-  // final String _dashboardUrl = 'https://medmoney-visuals.lovable.app';
-  final String _dashboardUrl = 'http://medmoney.me:8081';
+  // URL do dashboard React
+  String _dashboardUrl = 'http://medmoney.me:8081'; // Apontando diretamente para o VPS para testes
   
   // ID único para o iframe
   final String _iframeElementId = 'dashboard-iframe';
+  
+  // Controle do erro de carregamento do iframe
+  bool _iframeError = false;
 
   @override
   void initState() {
@@ -53,13 +56,94 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
   
+  // Registrar o iframe para uso no Flutter Web
+  void _registerIframe() {
+    // Obter token e ID do usuário para autenticação
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final refreshToken = Supabase.instance.client.auth.currentSession?.refreshToken;
+    
+    // URL completa com parâmetros de autenticação
+    final dashboardUrlWithAuth = Uri.parse(_dashboardUrl).replace(
+      queryParameters: {
+        'token': token,
+        'userId': userId,
+        'refreshToken': refreshToken,
+      },
+    ).toString();
+    
+    debugPrint('Carregando dashboard React de: $dashboardUrlWithAuth');
+    
+    // Registrar um elemento de visualização para o iframe
+    ui_web.platformViewRegistry.registerViewFactory(
+      _iframeElementId,
+      (int viewId) {
+        final iframe = html.IFrameElement()
+          ..src = dashboardUrlWithAuth
+          ..style.border = 'none'
+          ..style.height = '100%'
+          ..style.width = '100%'
+          ..style.backgroundColor = '#0A0A3E'
+          ..allowFullscreen = true;
+        
+        // Permitir comunicação e recursos
+        iframe.setAttribute('allow', 'autoplay; camera; microphone; fullscreen');
+        
+        // Monitorar carregamento e erros
+        iframe.onLoad.listen((_) {
+          setState(() {
+            _isLoading = false;
+          });
+          
+          // Adicionar token no localStorage do iframe para acesso pelo React
+          iframe.contentWindow?.postMessage(
+            '''{
+              "type": "AUTH_INIT",
+              "data": {
+                "token": "$token",
+                "userId": "$userId",
+                "refreshToken": "$refreshToken"
+              }
+            }''',
+            '*'
+          );
+        });
+        
+        iframe.onError.listen((event) {
+          debugPrint('Erro ao carregar o dashboard React: $event');
+          setState(() {
+            _iframeError = true;
+          });
+        });
+        
+        // Configurar comunicação entre iframe e Flutter
+        html.window.addEventListener('message', (event) {
+          if (event is html.MessageEvent) {
+            _handleDashboardMessage(event.data.toString());
+          }
+        });
+        
+        return iframe;
+      },
+    );
+  }
+  
   // Inicializar WebView para dispositivos móveis
   void _initWebView() {
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
     final userId = Supabase.instance.client.auth.currentUser?.id;
+    final refreshToken = Supabase.instance.client.auth.currentSession?.refreshToken;
     
     // URL do dashboard com parâmetros de autenticação
-    final dashboardUrl = '$_dashboardUrl?token=$token&userId=$userId';
+    final dashboardUrl = Uri.parse(_dashboardUrl).replace(
+      queryParameters: {
+        'token': token,
+        'userId': userId,
+        'refreshToken': refreshToken,
+      },
+    ).toString();
+    
+    debugPrint('Inicializando WebView para dashboard: $dashboardUrl');
     
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -74,6 +158,21 @@ class _DashboardPageState extends State<DashboardPage> {
             setState(() {
               _isLoading = false;
             });
+            
+            // Injetar token no localStorage após o carregamento da página
+            _webViewController?.runJavaScript('''
+              localStorage.setItem('supabaseToken', '$token');
+              localStorage.setItem('userId', '$userId');
+              localStorage.setItem('refreshToken', '$refreshToken');
+              
+              // Notificar app React que autenticação está disponível
+              window.dispatchEvent(new CustomEvent('authReady', {
+                detail: {
+                  token: '$token',
+                  userId: '$userId'
+                }
+              }));
+            ''');
           },
           onWebResourceError: (WebResourceError error) {
             setState(() {
@@ -92,46 +191,13 @@ class _DashboardPageState extends State<DashboardPage> {
       ..loadRequest(Uri.parse(dashboardUrl));
   }
   
-  // Registrar o iframe para uso no Flutter Web
-  void _registerIframe() {
-    // Obter token e ID do usuário para autenticação
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    
-    // URL completa com parâmetros de autenticação
-    final dashboardUrlWithAuth = '$_dashboardUrl?token=$token&userId=$userId';
-    
-    // Registrar um elemento de visualização para o iframe
-    ui_web.platformViewRegistry.registerViewFactory(
-      _iframeElementId,
-      (int viewId) {
-        final iframe = html.IFrameElement()
-          ..src = dashboardUrlWithAuth
-          ..style.border = 'none'
-          ..style.height = '100%'
-          ..style.width = '100%'
-          ..allowFullscreen = true;
-        
-        // Configurar comunicação entre iframe e Flutter
-        html.window.addEventListener('message', (event) {
-          if (event is html.MessageEvent) {
-            _handleDashboardMessage(event.data.toString());
-          }
-        });
-        
-        return iframe;
-      },
-    );
-  }
-  
   // Processar mensagens recebidas do dashboard
   void _handleDashboardMessage(String message) {
-    debugPrint('Mensagem recebida do dashboard: $message');
+    debugPrint('Mensagem recebida do dashboard React: $message');
     
     try {
-      // Processar diferentes tipos de mensagens
+      // Processar diferentes tipos de mensagens do dashboard React
       if (message.contains('DATA_UPDATED')) {
-        // Atualizar dados do app conforme necessário
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dados atualizados no dashboard'),
@@ -139,25 +205,50 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         );
       } else if (message.contains('AUTH_ERROR')) {
-        // Tratar erros de autenticação
         _logout();
+      } else if (message.contains('TOKEN_REFRESH_NEEDED')) {
+        // Atualizar token e enviar de volta
+        _refreshToken();
       }
     } catch (e) {
       debugPrint('Erro ao processar mensagem do dashboard: $e');
     }
   }
   
-  // Enviar mensagem para o dashboard (para dispositivos móveis)
-  void _sendMessageToDashboard(String message) {
-    if (!kIsWeb && _webViewController != null) {
-      _webViewController!.runJavaScript(
-        '''
-        window.postMessage(
-          JSON.stringify($message),
-          '*'
-        );
-        '''
-      );
+  // Método para atualizar token
+  Future<void> _refreshToken() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      
+      if (session != null) {
+        // Atualizar sessão
+        final newToken = session.accessToken;
+        
+        // Enviar novo token para o iframe/webview
+        if (kIsWeb) {
+          final message = {
+            'type': 'TOKEN_REFRESHED',
+            'data': {
+              'token': newToken,
+            }
+          };
+          final jsonMessage = json.encode(message);
+          
+          // Enviar através do postMessage
+          html.window.postMessage(jsonMessage, '*');
+        } else if (_webViewController != null) {
+          // Atualizar token no localStorage do WebView
+          _webViewController!.runJavaScript('''
+            localStorage.setItem('supabaseToken', '$newToken');
+            window.dispatchEvent(new CustomEvent('tokenRefreshed', {
+              detail: { token: '$newToken' }
+            }));
+          ''');
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao atualizar token: $e');
     }
   }
 
@@ -325,13 +416,65 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildWebDashboard() {
+    // Fallback em caso de erro no carregamento do iframe
+    if (_iframeError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: AppTheme.errorColor,
+              size: 64,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Não foi possível carregar o dashboard',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.errorColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tentando carregar o dashboard de: $_dashboardUrl',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondaryColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _iframeError = false;
+                });
+              },
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+    
     // Usar HtmlElementView para renderizar o iframe no Flutter Web
-    return SizedBox(
-      width: double.infinity,
-      height: double.infinity,
-      child: HtmlElementView(
-        viewType: _iframeElementId,
-      ),
+    return Stack(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: HtmlElementView(
+            viewType: _iframeElementId,
+          ),
+        ),
+        if (_isLoading)
+          const Center(
+            child: CircularProgressIndicator(),
+          ),
+      ],
     );
   }
 
