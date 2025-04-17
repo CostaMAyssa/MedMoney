@@ -38,6 +38,9 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    debugPrint('===== INICIANDO DASHBOARD =====');
+    debugPrint('Modo: ${kIsWeb ? "Web/Iframe" : "Mobile/WebView"}');
+    
     _checkSubscription();
     
     if (kIsWeb) {
@@ -48,27 +51,28 @@ class _DashboardPageState extends State<DashboardPage> {
       
       // Registramos o iframe após a construção do widget
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('Registrando iframe para o dashboard...');
         _registerIframe();
       });
     } else {
       // Em dispositivos móveis, configuramos o WebView
+      debugPrint('Inicializando WebView para o dashboard...');
       _initWebView();
     }
   }
   
   // Registrar o iframe para uso no Flutter Web
   void _registerIframe() {
-    // Obter token e ID do usuário para autenticação
+    // Obter token para autenticação
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    final refreshToken = Supabase.instance.client.auth.currentSession?.refreshToken;
     
-    // URL completa com parâmetros de autenticação
+    debugPrint('Token obtido: ${token != null ? "Sim (${token.substring(0, 10)}...)" : "Não"}');
+    
+    // URL simplificada com apenas o token, como o dashboard espera
     final dashboardUrlWithAuth = Uri.parse(_dashboardUrl).replace(
       queryParameters: {
         'token': token,
-        'userId': userId,
-        'refreshToken': refreshToken,
+        // Removido userId e refreshToken pois o dashboard não os processa
       },
     ).toString();
     
@@ -78,6 +82,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ui_web.platformViewRegistry.registerViewFactory(
       _iframeElementId,
       (int viewId) {
+        debugPrint('Criando elemento iframe (viewId: $viewId)');
         final iframe = html.IFrameElement()
           ..src = dashboardUrlWithAuth
           ..style.border = 'none'
@@ -91,35 +96,23 @@ class _DashboardPageState extends State<DashboardPage> {
         
         // Monitorar carregamento e erros
         iframe.onLoad.listen((_) {
+          debugPrint('Dashboard carregado com sucesso no iframe');
           setState(() {
             _isLoading = false;
           });
-          
-          // Adicionar token no localStorage do iframe para acesso pelo React
-          iframe.contentWindow?.postMessage(
-            '''{
-              "type": "AUTH_INIT",
-              "data": {
-                "token": "$token",
-                "userId": "$userId",
-                "refreshToken": "$refreshToken"
-              }
-            }''',
-            '*'
-          );
         });
         
         iframe.onError.listen((event) {
-          debugPrint('Erro ao carregar o dashboard React: $event');
+          debugPrint('ERRO ao carregar o dashboard React: $event');
           setState(() {
             _iframeError = true;
           });
         });
         
-        // Configurar comunicação entre iframe e Flutter
+        // Adicionar listener para mensagens do console do iframe (para debug)
         html.window.addEventListener('message', (event) {
           if (event is html.MessageEvent) {
-            _handleDashboardMessage(event.data.toString());
+            debugPrint('Mensagem recebida do iframe: ${event.data}');
           }
         });
         
@@ -131,15 +124,12 @@ class _DashboardPageState extends State<DashboardPage> {
   // Inicializar WebView para dispositivos móveis
   void _initWebView() {
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    final refreshToken = Supabase.instance.client.auth.currentSession?.refreshToken;
     
-    // URL do dashboard com parâmetros de autenticação
+    // URL simplificada apenas com o token
     final dashboardUrl = Uri.parse(_dashboardUrl).replace(
       queryParameters: {
         'token': token,
-        'userId': userId,
-        'refreshToken': refreshToken,
+        // Removido userId e refreshToken
       },
     ).toString();
     
@@ -159,20 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
               _isLoading = false;
             });
             
-            // Injetar token no localStorage após o carregamento da página
-            _webViewController?.runJavaScript('''
-              localStorage.setItem('supabaseToken', '$token');
-              localStorage.setItem('userId', '$userId');
-              localStorage.setItem('refreshToken', '$refreshToken');
-              
-              // Notificar app React que autenticação está disponível
-              window.dispatchEvent(new CustomEvent('authReady', {
-                detail: {
-                  token: '$token',
-                  userId: '$userId'
-                }
-              }));
-            ''');
+            // Removido código que tentava injetar tokens no localStorage
           },
           onWebResourceError: (WebResourceError error) {
             setState(() {
@@ -181,12 +158,6 @@ class _DashboardPageState extends State<DashboardPage> {
             });
           },
         ),
-      )
-      ..addJavaScriptChannel(
-        'MedMoneyApp',
-        onMessageReceived: (JavaScriptMessage message) {
-          _handleDashboardMessage(message.message);
-        },
       )
       ..loadRequest(Uri.parse(dashboardUrl));
   }
@@ -273,6 +244,9 @@ class _DashboardPageState extends State<DashboardPage> {
         _isCheckingSubscription = false;
       });
       
+      // TEMPORÁRIO: Forçar acesso ao dashboard para testes
+      // Comentado verificação de assinatura para isolar o problema
+      /*
       // Verificar se o usuário tem uma assinatura ativa e paga
       bool hasValidSubscription = false;
       
@@ -315,6 +289,7 @@ class _DashboardPageState extends State<DashboardPage> {
           });
         }
       }
+      */
     } catch (e) {
       debugPrint('Erro ao verificar assinatura: $e');
       setState(() {
@@ -326,8 +301,10 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     // Verificar se o usuário tem uma assinatura premium ativa
-    bool hasValidSubscription = false;
+    // TEMPORÁRIO: Forçar acesso ao dashboard para teste
+    bool hasValidSubscription = true; // Forçando acesso
     
+    /*
     if (_subscription != null) {
       bool isActive = _subscription!['status'] == 'active';
       bool isPaid = _subscription!['payment_status'] == 'confirmed' || 
@@ -336,6 +313,7 @@ class _DashboardPageState extends State<DashboardPage> {
       
       hasValidSubscription = isActive && isPaid && isPremium;
     }
+    */
     
     return Scaffold(
       appBar: AppBar(
