@@ -27,6 +27,11 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _subscription;
   WebViewController? _webViewController;
   
+  // Estado para controlar a autenticação no React
+  bool _silentLoginCompleted = false;
+  bool _silentLoginFailed = false;
+  String? _silentLoginError;
+  
   // URL do dashboard React
   String _dashboardUrl = 'http://medmoney.me:8081'; // Apontando diretamente para o VPS para testes
   
@@ -75,6 +80,9 @@ class _DashboardPageState extends State<DashboardPage> {
       _usingFallbackUrl = !_usingFallbackUrl;
       _isLoading = true;
       _iframeError = false;
+      _silentLoginCompleted = false;
+      _silentLoginFailed = false;
+      _silentLoginError = null;
     });
     
     final newUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
@@ -96,12 +104,15 @@ class _DashboardPageState extends State<DashboardPage> {
     final String? token = session?.accessToken;
     final String? refreshToken = session?.refreshToken;
     final String? userId = Supabase.instance.client.auth.currentUser?.id;
+    final String? email = Supabase.instance.client.auth.currentUser?.email;
     
     debugPrint('[Dashboard] Token disponível: ${token != null}');
+    debugPrint('[Dashboard] RefreshToken disponível: ${refreshToken != null}');
     debugPrint('[Dashboard] User ID disponível: ${userId != null}');
+    debugPrint('[Dashboard] Email disponível: ${email != null}');
     
-    if (token == null || userId == null) {
-      debugPrint('[Dashboard] ERRO: Token ou User ID não disponíveis');
+    if (token == null || userId == null || refreshToken == null) {
+      debugPrint('[Dashboard] ERRO: Token, RefreshToken ou User ID não disponíveis');
       setState(() {
         _iframeError = true;
         _errorMessage = 'Erro de autenticação. Por favor, faça login novamente.';
@@ -110,13 +121,10 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    // Construir URL com parâmetros de autenticação
+    // Construir URL com parâmetros mínimos (apenas para inicialização básica)
     final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
     final url = Uri.parse(baseUrl).replace(
       queryParameters: {
-        'token': token,
-        'userId': userId,
-        'refreshToken': refreshToken,
         't': DateTime.now().millisecondsSinceEpoch.toString(), // Evita cache
       },
     ).toString();
@@ -144,24 +152,10 @@ class _DashboardPageState extends State<DashboardPage> {
       // Monitorar carregamento do iframe
       iframe.onLoad.listen((event) {
         debugPrint('[Dashboard] Iframe carregado com sucesso');
-        _setIframeError(false);
         
-        // Enviar mensagem com os dados de autenticação para o dashboard
+        // Agendar o envio dos dados de login silencioso
         Future.delayed(const Duration(milliseconds: 500), () {
-          try {
-            // Atenção: formato adaptado para o que o React espera
-            final authMessage = {
-              'type': 'AUTH_DATA',
-              'token': token,
-              'userId': userId,
-              'refreshToken': refreshToken,
-            };
-            
-            debugPrint('[Dashboard] Enviando dados de autenticação via postMessage');
-            iframe.contentWindow?.postMessage(jsonEncode(authMessage), '*');
-          } catch (e) {
-            debugPrint('[Dashboard] ERRO ao enviar mensagem para iframe: $e');
-          }
+          _requestSilentLogin();
         });
       });
 
@@ -170,19 +164,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
     // Configurar listener para mensagens do iframe
     html.window.onMessage.listen((html.MessageEvent event) {
-      try {
-        debugPrint('[Dashboard] Mensagem recebida do iframe: ${event.data}');
-        
-        // Tentar decodificar a mensagem
-        // Mas primeiro verificar se é uma string de JSON válida
-        if (event.data is String && event.data.toString().trim().startsWith('{')) {
-          final data = jsonDecode(event.data);
-          _processMessageFromDashboard(data);
-        } else {
-          debugPrint('[Dashboard] Formato de mensagem não reconhecido, ignorando');
+      if (event is html.MessageEvent) {
+        try {
+          debugPrint('[Dashboard] Mensagem recebida do iframe: ${event.data}');
+          
+          // Tentar decodificar a mensagem
+          // Mas primeiro verificar se é uma string de JSON válida
+          if (event.data is String && event.data.toString().trim().startsWith('{')) {
+            final data = jsonDecode(event.data);
+            _processMessageFromDashboard(data);
+          } else {
+            debugPrint('[Dashboard] Formato de mensagem não reconhecido, ignorando');
+          }
+        } catch (e) {
+          debugPrint('[Dashboard] ERRO ao processar mensagem do iframe: $e');
         }
-      } catch (e) {
-        debugPrint('[Dashboard] ERRO ao processar mensagem do iframe: $e');
       }
     });
 
@@ -203,32 +199,68 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     });
   }
+  
+  // Solicita login silencioso ao dashboard React
+  void _requestSilentLogin() {
+    debugPrint('[Dashboard] Solicitando login silencioso ao React...');
+    
+    // Obter tokens e informações necessárias para autenticação
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null || !mounted) {
+      debugPrint('[Dashboard] ERRO: Sessão não disponível para login silencioso');
+      _setIframeError(true, errorMessage: 'Erro de autenticação. Sessão não disponível.');
+      return;
+    }
+    
+    final String? token = session.accessToken;
+    final String? refreshToken = session.refreshToken;
+    final String? userId = Supabase.instance.client.auth.currentUser?.id;
+    final String? email = Supabase.instance.client.auth.currentUser?.email;
+    
+    if (token == null || userId == null || refreshToken == null) {
+      debugPrint('[Dashboard] ERRO: Dados de autenticação incompletos');
+      _setIframeError(true, errorMessage: 'Dados de autenticação incompletos.');
+      return;
+    }
+    
+    // Preparar dados para login silencioso
+    final loginData = {
+      'type': 'SILENT_LOGIN_REQUEST',
+      'accessToken': token,
+      'refreshToken': refreshToken,
+      'userId': userId,
+      'email': email,
+    };
+    
+    debugPrint('[Dashboard] Enviando dados para login silencioso');
+    
+    try {
+      // Enviar para o iframe
+      if (kIsWeb) {
+        final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
+        iframe?.contentWindow?.postMessage(jsonEncode(loginData), '*');
+      } else if (_webViewController != null) {
+        // Para WebView mobile
+        _webViewController?.runJavaScript(
+          "window.postMessage(${jsonEncode(loginData)}, '*');"
+        );
+      }
+    } catch (e) {
+      debugPrint('[Dashboard] ERRO ao enviar dados para login silencioso: $e');
+      _setIframeError(true, errorMessage: 'Erro ao enviar dados de autenticação.');
+    }
+  }
 
   // Inicializar WebView para dispositivos móveis
   void _initWebView() {
     debugPrint('[Dashboard] Inicializando WebView para dispositivos móveis');
     
-    final session = Supabase.instance.client.auth.currentSession;
-    final String? token = session?.accessToken;
-    final String? userId = Supabase.instance.client.auth.currentUser?.id;
-    
-    if (token == null || userId == null) {
-      setState(() {
-        _errorMessage = 'Erro de autenticação. Por favor, faça login novamente.';
-        _isLoading = false;
-      });
-      return;
-    }
-    
     // Escolher URL base (principal ou fallback)
     final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
     
-    // URL com os tokens necessários
+    // URL com parâmetro para evitar cache
     final url = Uri.parse(baseUrl).replace(
       queryParameters: {
-        'token': token,
-        'userId': userId,
-        'refreshToken': session?.refreshToken,
         't': DateTime.now().millisecondsSinceEpoch.toString(),
       },
     ).toString();
@@ -252,7 +284,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 _isLoading = false;
               });
               
-              // Injetar script para adicionar listener de mensagem
+              // Solicitar login silencioso após carregar página
+              Future.delayed(const Duration(milliseconds: 500), () {
+                _requestSilentLogin();
+              });
+              
+              // Configurar listener para mensagens
               _webViewController?.runJavaScript('''
                 window.addEventListener('message', function(event) {
                   console.log('Mensagem recebida no WebView:', event.data);
@@ -272,6 +309,7 @@ class _DashboardPageState extends State<DashboardPage> {
               setState(() {
                 _isLoading = false;
                 _errorMessage = 'Erro ao carregar dashboard: ${error.description}';
+                _iframeError = true;
               });
             }
           },
@@ -280,13 +318,13 @@ class _DashboardPageState extends State<DashboardPage> {
       ..loadRequest(Uri.parse(url));
   }
 
-  void _setIframeError(bool hasError) {
+  void _setIframeError(bool hasError, {String? errorMessage}) {
     if (mounted) {
       setState(() {
         _iframeError = hasError;
         _isLoading = false;
         if (hasError) {
-          _errorMessage = 'Não foi possível carregar o dashboard. Verifique sua conexão.';
+          _errorMessage = errorMessage ?? 'Não foi possível carregar o dashboard. Verifique sua conexão.';
         } else {
           _errorMessage = null;
         }
@@ -306,39 +344,58 @@ class _DashboardPageState extends State<DashboardPage> {
           _isLoading = false;
         });
         
-        // Reenvia os dados de autenticação para garantir
-        final session = Supabase.instance.client.auth.currentSession;
-        if (session != null && kIsWeb) {
-          final authData = {
-            'type': 'AUTH_DATA',
-            'token': session.accessToken,
-            'userId': Supabase.instance.client.auth.currentUser?.id,
-            'refreshToken': session.refreshToken,
-          };
-          
-          debugPrint('[Dashboard] Reenviando dados de autenticação após DASHBOARD_READY');
-          final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
-          iframe?.contentWindow?.postMessage(jsonEncode(authData), '*');
+        // Solicitar login silencioso se ainda não completado
+        if (!_silentLoginCompleted && !_silentLoginFailed) {
+          _requestSilentLogin();
         }
         break;
+        
+      case 'SILENT_LOGIN_SUCCESS':
+        debugPrint('[Dashboard] Login silencioso realizado com sucesso');
+        setState(() {
+          _silentLoginCompleted = true;
+          _silentLoginFailed = false;
+          _silentLoginError = null;
+          _isLoading = false;
+          _iframeError = false;
+          _errorMessage = null;
+        });
+        break;
+        
+      case 'SILENT_LOGIN_FAILED':
+        debugPrint('[Dashboard] Falha no login silencioso: ${data['error']}');
+        setState(() {
+          _silentLoginCompleted = false;
+          _silentLoginFailed = true;
+          _silentLoginError = data['error'] ?? 'Erro desconhecido no login silencioso';
+          _isLoading = false;
+          _iframeError = true;
+          _errorMessage = 'Erro de autenticação: ${data['error']}';
+        });
+        break;
+        
       case 'TOKEN_EXPIRED':
         debugPrint('[Dashboard] Token expirado, tentando renovar');
         _refreshToken();
         break;
+        
       case 'UPDATE_SUBSCRIPTION':
         debugPrint('[Dashboard] Atualizando informações de assinatura');
         _checkSubscription();
         break;
+        
       case 'ERROR':
         debugPrint('[Dashboard] Erro reportado pelo dashboard: ${data['message']}');
         setState(() {
           _errorMessage = data['message'] ?? 'Erro no dashboard';
         });
         break;
+        
       case 'LOGOUT':
         debugPrint('[Dashboard] Solicitação de logout recebida');
         _logout();
         break;
+        
       default:
         debugPrint('[Dashboard] Tipo de mensagem não reconhecido: ${data['type']}');
     }
@@ -353,32 +410,15 @@ class _DashboardPageState extends State<DashboardPage> {
       
       if (session != null) {
         debugPrint('[Dashboard] Token renovado com sucesso');
-        // Enviar novo token para o iframe
-        if (kIsWeb) {
-          final authData = {
-            'type': 'AUTH_DATA',
-            'token': session.accessToken,
-            'userId': session.user.id,
-            'refreshToken': session.refreshToken,
-          };
-          
-          final iframe = html.document.getElementById('dashboard-iframe') as html.IFrameElement?;
-          iframe?.contentWindow?.postMessage(jsonEncode(authData), '*');
-          debugPrint('[Dashboard] Novo token enviado para o dashboard');
-        } else if (_webViewController != null) {
-          // Para WebView mobile
-          final authData = jsonEncode({
-            'type': 'AUTH_DATA',
-            'token': session.accessToken,
-            'userId': session.user.id,
-            'refreshToken': session.refreshToken,
-          });
-          
-          await _webViewController?.runJavaScript(
-            "window.postMessage($authData, '*');"
-          );
-          debugPrint('[Dashboard] Novo token enviado para WebView');
-        }
+        
+        // Solicitar nova autenticação silenciosa com o token renovado
+        setState(() {
+          _silentLoginCompleted = false;
+          _silentLoginFailed = false;
+          _silentLoginError = null;
+        });
+        
+        _requestSilentLogin();
       } else {
         debugPrint('[Dashboard] Falha ao renovar token: sessão nula');
         // Token não pode ser renovado, redirecionar para login
@@ -534,22 +574,35 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         actions: [
+          // Status de autenticação silenciosa
+          if (_silentLoginCompleted)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Chip(
+                backgroundColor: AppTheme.successColor.withOpacity(0.2),
+                label: const Text(
+                  'Autenticado',
+                  style: TextStyle(
+                    color: AppTheme.successColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                avatar: const Icon(
+                  Icons.verified_user,
+                  color: AppTheme.successColor,
+                  size: 14,
+                ),
+              ),
+            ),
+          
           // Botão para abrir no navegador (apenas Web)
           if (kIsWeb)
             IconButton(
               icon: const Icon(Icons.open_in_new, size: 26),
               onPressed: () {
-                // Obter URL com token
-                final token = Supabase.instance.client.auth.currentSession?.accessToken;
-                final baseUrl = _usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl;
-                final urlWithToken = Uri.parse(baseUrl).replace(
-                  queryParameters: {
-                    'token': token,
-                  },
-                ).toString();
-                
                 // Abrir em nova janela
-                html.window.open(urlWithToken, '_blank');
+                html.window.open(_usingFallbackUrl ? _fallbackDashboardUrl : _dashboardUrl, '_blank');
               },
               tooltip: 'Abrir em nova janela',
             ),
@@ -562,6 +615,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 _isLoading = true;
                 _iframeError = false;
                 _errorMessage = null;
+                _silentLoginCompleted = false;
+                _silentLoginFailed = false;
+                _silentLoginError = null;
               });
               if (kIsWeb) {
                 _registerIframe();
@@ -573,9 +629,7 @@ class _DashboardPageState extends State<DashboardPage> {
           // Botão para alternar URL
           IconButton(
             icon: const Icon(Icons.swap_horiz, size: 26),
-            onPressed: () {
-              _toggleDashboardUrl();
-            },
+            onPressed: _toggleDashboardUrl,
             tooltip: _usingFallbackUrl ? 'Usar URL principal' : 'Usar URL alternativa',
           ),
           // Exibir status da assinatura
@@ -632,6 +686,11 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 8),
                           Text('Token disponível: ${Supabase.instance.client.auth.currentSession?.accessToken != null}'),
                           Text('User ID: ${Supabase.instance.client.auth.currentUser?.id ?? "Não disponível"}'),
+                          Text('Email: ${Supabase.instance.client.auth.currentUser?.email ?? "Não disponível"}'),
+                          const SizedBox(height: 8),
+                          Text('Login silencioso: ${_silentLoginCompleted ? "Completado" : (_silentLoginFailed ? "Falhou" : "Pendente")}'),
+                          if (_silentLoginError != null)
+                            Text('Erro login: $_silentLoginError', style: const TextStyle(color: Colors.red)),
                           const SizedBox(height: 8),
                           Text('Status: ${_isLoading ? "Carregando" : _iframeError ? "Erro" : "Carregado"}'),
                           if (_errorMessage != null)
@@ -652,6 +711,9 @@ class _DashboardPageState extends State<DashboardPage> {
                           setState(() {
                             _isLoading = true;
                             _iframeError = false;
+                            _silentLoginCompleted = false;
+                            _silentLoginFailed = false;
+                            _silentLoginError = null;
                           });
                           if (kIsWeb) {
                             _registerIframe();
@@ -696,8 +758,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildWebDashboard() {
-    // Fallback em caso de erro no carregamento do iframe
-    if (_iframeError) {
+    // Mostrar tela de erro se o iframe falhou ou houve erro no login silencioso
+    if (_iframeError || _silentLoginFailed) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -748,6 +810,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       _iframeError = false;
                       _isLoading = true;
                       _errorMessage = null;
+                      _silentLoginCompleted = false;
+                      _silentLoginFailed = false;
+                      _silentLoginError = null;
                     });
                     _registerIframe();
                   },
@@ -793,48 +858,55 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     }
     
+    // Mostrar erro se houve falha no login silencioso ou outro problema
+    if (_iframeError || _silentLoginFailed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: AppTheme.errorColor,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage ?? 'Erro ao carregar o dashboard',
+                style: const TextStyle(
+                  color: AppTheme.errorColor,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _errorMessage = null;
+                    _isLoading = true;
+                    _iframeError = false;
+                    _silentLoginCompleted = false;
+                    _silentLoginFailed = false;
+                    _silentLoginError = null;
+                  });
+                  _initWebView();
+                },
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Stack(
       children: [
         WebViewWidget(controller: _webViewController!),
         if (_isLoading)
           const Center(
             child: CircularProgressIndicator(),
-          ),
-        if (_errorMessage != null)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: AppTheme.errorColor,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage!,
-                    style: const TextStyle(
-                      color: AppTheme.errorColor,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _errorMessage = null;
-                        _isLoading = true;
-                      });
-                      _initWebView();
-                    },
-                    child: const Text('Tentar novamente'),
-                  ),
-                ],
-              ),
-            ),
           ),
       ],
     );
