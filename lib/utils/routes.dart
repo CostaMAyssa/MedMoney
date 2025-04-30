@@ -38,7 +38,7 @@ class AppRoutes {
       return RegisterPage(initialData: args);
     },
     forgotPassword: (context) => const ForgotPasswordPage(),
-    dashboard: (context) => const DashboardPage(),
+    dashboard: (context) => const AcessoDashboardPage(),
     splash: (context) => const SplashScreen(),
     payment: (context) {
       final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
