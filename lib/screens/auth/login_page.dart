@@ -36,7 +36,7 @@ class LoginPage extends StatelessWidget {
             
             // Conteúdo principal em estilo Hero, similar à home
             ResponsiveContainer(
-              padding: const EdgeInsets.symmetric(vertical: 80.0),
+              padding: const EdgeInsets.symmetric(vertical: 60.0),
               child: MediaQuery.of(context).size.width > 800
                 ? Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -56,9 +56,9 @@ class LoginPage extends StatelessWidget {
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _buildLeftContent(context),
-                    const SizedBox(height: 60),
                     _buildRightContent(context),
+                    const SizedBox(height: 40),
+                    _buildLeftContent(context),
                   ],
                 ),
             ),
@@ -73,73 +73,107 @@ class LoginPage extends StatelessWidget {
 
   Widget _buildLeftContent(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
+    final isMobile = MediaQuery.of(context).size.width <= 600;
     
-    return Column(
-      crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bar_chart,
-              size: 48,
-              color: AppTheme.primaryColor,
+    return Container(
+      width: isDesktop ? double.infinity : MediaQuery.of(context).size.width,
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 0 : 20),
+      child: Column(
+        crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        children: [
+          isMobile 
+          ? Column(
+              children: [
+                Icon(
+                  Icons.bar_chart,
+                  size: 48,
+                  color: AppTheme.primaryColor,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Dashboard MedMoney',
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                    fontSize: isDesktop ? 40 : 32,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.bar_chart,
+                  size: 48,
+                  color: AppTheme.primaryColor,
+                ),
+                const SizedBox(width: 20),
+                Text(
+                  'Dashboard MedMoney',
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                    fontSize: isDesktop ? 40 : 32,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 20),
-            Text(
-              'Dashboard MedMoney',
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryColor,
-                fontSize: 40,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Seu controle financeiro inteligente',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimaryColor,
-          ),
-          textAlign: isDesktop ? TextAlign.left : TextAlign.center,
-        ),
-        const SizedBox(height: 40),
-        Container(
-          width: isDesktop ? null : 600,
-          constraints: BoxConstraints(
-            maxWidth: 600,
-          ),
-          child: Text(
-            'Tenha acesso a um painel moderno e interativo feito para profissionais da saúde que querem mais controle e clareza sobre suas finanças.',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppTheme.textSecondaryColor,
-              height: 1.5,
+          const SizedBox(height: 20),
+          Text(
+            'Seu aliado no controle financeiro',
+            style: TextStyle(
+              fontSize: isDesktop ? 28 : 24,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textPrimaryColor,
             ),
             textAlign: isDesktop ? TextAlign.left : TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 50),
-        Container(
-          width: isDesktop ? 550 : 500,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFeatureItem(
-                Icons.lightbulb_outline,
-                'Visualize receitas, despesas, saldo mensal e até gastos previstos com poucos cliques.',
+          const SizedBox(height: 30),
+          Container(
+            width: isDesktop ? null : MediaQuery.of(context).size.width - 40,
+            constraints: BoxConstraints(
+              maxWidth: 600,
+            ),
+            child: Text(
+              'Fui criado especialmente para profissionais da saúde como você, que buscam praticidade e clareza na hora de gerenciar suas finanças.',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppTheme.textSecondaryColor,
+                height: 1.5,
+                fontSize: isDesktop ? 18 : 16,
               ),
-              const SizedBox(height: 24),
-              _buildFeatureItem(
-                Icons.bar_chart,
-                'Planeje seus plantões, acompanhe metas e tome decisões baseadas em dados reais.',
-              ),
-            ],
+              textAlign: isDesktop ? TextAlign.left : TextAlign.center,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 30),
+          Container(
+            width: isDesktop ? 550 : MediaQuery.of(context).size.width - 40,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFeatureItem(
+                  Icons.lightbulb_outline,
+                  'Visualize receitas, despesas, saldo mensal e até gastos previstos com facilidade.',
+                  isDesktop,
+                ),
+                const SizedBox(height: 20),
+                _buildFeatureItem(
+                  Icons.bar_chart,
+                  'Organize seus plantões, acompanhe metas e tome decisões com base em dados reais, não achismos.',
+                  isDesktop,
+                ),
+                const SizedBox(height: 20),
+                _buildFeatureItem(
+                  Icons.medical_services_outlined,
+                  'Pode confiar: eu cuido dos números pra você cuidar dos seus pacientes. ',
+                  isDesktop,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -147,8 +181,8 @@ class LoginPage extends StatelessWidget {
     final isDesktop = MediaQuery.of(context).size.width > 800;
     
     return Container(
-      width: isDesktop ? double.infinity : 500,
-      padding: const EdgeInsets.all(40),
+      width: isDesktop ? double.infinity : MediaQuery.of(context).size.width,
+      padding: EdgeInsets.symmetric(horizontal: 40, vertical: isDesktop ? 40 : 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -156,15 +190,15 @@ class LoginPage extends StatelessWidget {
             children: [
               Icon(
                 Icons.waving_hand,
-                size: 36,
+                size: isDesktop ? 36 : 30,
                 color: AppTheme.primaryColor,
               ),
               SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  'Bem-vindo(a) ao seu painel',
+                  'Olá! Eu sou o Dashboard MedMoney',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 25,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimaryColor,
                   ),
@@ -172,17 +206,17 @@ class LoginPage extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           
           Text(
-            'Acesse agora o novo sistema MedMoney e aproveite todos os recursos do seu plano Premium com segurança e praticidade.',
+            ' Pronto para começar?\n\nO acesso ao seu painel agora é feito dentro do novo sistema MedMoney. Clique no botão abaixo para fazer login com segurança e aproveitar todos os recursos do seu plano.',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: isDesktop ? 18 : 16,
               color: AppTheme.textSecondaryColor,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 50),
+          const SizedBox(height: 40),
           
           SizedBox(
             width: double.infinity,
@@ -221,7 +255,7 @@ class LoginPage extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'O login e a recuperação de senha agora são feitos dentro do painel.',
+                  'O login e a recuperação de senha agora são feitos diretamente no painel.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.orange[300],
@@ -264,21 +298,21 @@ class LoginPage extends StatelessWidget {
     );
   }
   
-  Widget _buildFeatureItem(IconData icon, String text) {
+  Widget _buildFeatureItem(IconData icon, String text, bool isDesktop) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
-          size: 36,
+          size: isDesktop ? 36 : 30,
           color: AppTheme.primaryColor,
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: 15),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: isDesktop ? 18 : 16,
               color: AppTheme.textSecondaryColor,
               height: 1.5,
             ),
