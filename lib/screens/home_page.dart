@@ -256,12 +256,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(width: 24),
                     _buildBenefitCard(
-                      icon: Icons.calendar_today,
-                      title: 'Agenda Automática',
-                      description: 'Seus plantões são automaticamente adicionados ao Google Calendar',
-                    ),
-                    const SizedBox(width: 24),
-                    _buildBenefitCard(
                       icon: Icons.notifications_active,
                       title: 'Notificações Inteligentes',
                       description: 'Receba alertas de pagamentos e compromissos importantes',
@@ -285,11 +279,6 @@ class _HomePageState extends State<HomePage> {
                       icon: Icons.whatshot,
                       title: 'Integração com WhatsApp',
                       description: 'Registre entradas e saídas financeiras diretamente pelo WhatsApp',
-                    ),
-                    _buildBenefitCard(
-                      icon: Icons.calendar_today,
-                      title: 'Agenda Automática',
-                      description: 'Seus plantões são automaticamente adicionados ao Google Calendar',
                     ),
                     _buildBenefitCard(
                       icon: Icons.notifications_active,

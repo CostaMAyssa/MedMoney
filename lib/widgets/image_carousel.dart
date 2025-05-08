@@ -97,6 +97,9 @@ class _ImageCarouselState extends State<ImageCarousel> {
                     _buildImageCardWithNetwork('assets/images/image3.jpeg', 
                       'https://images.unsplash.com/photo-1579621970795-87facc2f976d', 
                       'Relatórios detalhados para melhor gestão'),
+                    _buildImageCardWithNetwork('assets/images/image4.jpeg', 
+                      'https://images.unsplash.com/photo-1583324113626-70df0f4deaab', 
+                      'Gerencie suas finanças de qualquer lugar'),
                   ],
                 ),
                 // Botões de navegação
@@ -130,7 +133,7 @@ class _ImageCarouselState extends State<ImageCarousel> {
                         color: Colors.white,
                         size: 24,
                       ),
-                      onPressed: _currentPage < 2 ? () => _goToPage(_currentPage + 1) : null,
+                      onPressed: _currentPage < 3 ? () => _goToPage(_currentPage + 1) : null,
                     ),
                   ),
                 ),
@@ -141,7 +144,7 @@ class _ImageCarouselState extends State<ImageCarousel> {
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (index) {
+            children: List.generate(4, (index) {
               return GestureDetector(
                 onTap: () => _goToPage(index),
                 child: Container(
