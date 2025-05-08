@@ -39,29 +39,9 @@ class _SplashScreenState extends State<SplashScreen> {
           
           debugPrint('Tipo de acesso do usuário: $accessType');
           
-          switch (accessType) {
-            case 'premium':
-              // Usuário Premium com assinatura ativa vai para o dashboard
-              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-              break;
-              
-            case 'essential':
-              // Usuário Essencial vai para o dashboard também
-              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-              break;
-              
-            case 'pending_payment':
-              // Pagamento pendente também vai para o dashboard
-              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-              break;
-              
-            case 'no_subscription':
-            case 'unknown':
-            case 'error':
-            default:
-              // Todos os casos vão para o dashboard
-              Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-              break;
+          // Redirecionar para a tela de login em vez do dashboard
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, AppRoutes.login);
           }
         } catch (e) {
           debugPrint('Erro ao verificar assinatura: $e');
